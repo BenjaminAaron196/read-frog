@@ -1,5 +1,27 @@
 # @read-frog/extension
 
+## 1.47.4
+
+### Patch Changes
+
+- [#2203](https://github.com/mengxi-ream/read-frog/pull/2203) [`3166b7f`](https://github.com/mengxi-ream/read-frog/commit/3166b7fcbf92e9f291129bd1a77e0a7b3568b158) Thanks [@ananaBMaster](https://github.com/ananaBMaster)! - style(providers): drop the sponsor badge from Atlas Cloud
+
+- [#2208](https://github.com/mengxi-ream/read-frog/pull/2208) [`55b551d`](https://github.com/mengxi-ream/read-frog/commit/55b551d20add4cc45de0a6e4be1d4d9f297a9bfc) Thanks [@mengxi-ream](https://github.com/mengxi-ream)! - feat(custom-actions): add a {{webUrl}} prompt cell for the current page URL
+
+- [#2206](https://github.com/mengxi-ream/read-frog/pull/2206) [`9849557`](https://github.com/mengxi-ream/read-frog/commit/9849557d8f58696738e3a0db05938403e5636b15) Thanks [@ananaBMaster](https://github.com/ananaBMaster)! - chore(providers): swap Atlas Cloud for DeepSeek in the fresh-install provider list
+
+- [#2205](https://github.com/mengxi-ream/read-frog/pull/2205) [`ad9cf88`](https://github.com/mengxi-ream/read-frog/commit/ad9cf880bc6caa186196dde7b15080b3c8ad6bb9) Thanks [@ananaBMaster](https://github.com/ananaBMaster)! - chore(analytics): count glossary terms reaching a prompt as feature usage
+
+  Anonymous usage analytics now records a `glossary` feature the moment one of your terms
+  actually matches and goes into a translation prompt, alongside the events the other
+  features already report. Owning a glossary reports nothing; the terms have to match.
+
+  The event says which feature the terms rode in on — page translation, subtitles, the
+  selection toolbar, or input translation — and nothing else. The terms themselves, and
+  the text they matched in, never leave the browser. It is throttled by the same
+  once-per-day cache as every other feature-usage event, and the analytics opt-out in
+  Settings switches it off with the rest.
+
 ## 1.47.3
 
 ### Patch Changes
