@@ -11,6 +11,7 @@ import {
 } from "@/utils/constants/storage-keys"
 import { getSelectionToolbarActions } from "@/utils/custom-actions"
 import { i18n } from "@/utils/i18n"
+import { logger } from "@/utils/logger"
 import { sendMessage } from "@/utils/message"
 import { ensureInitializedConfig } from "./config"
 import { getPageTranslationEnabled, setPageTranslationEnabled } from "./page-translation-state"
@@ -214,7 +215,9 @@ async function handleTranslateClick(tabId: number, tabUrl?: string) {
 
   if (!newState) {
     await setPageTranslationEnabled(tabId, false, tabUrl, true)
-    void sendMessage("notifyTranslationStateChanged", { enabled: false }, tabId)
+    void sendMessage("notifyTranslationStateChanged", { enabled: false }, tabId).catch((error) =>
+      logger.warn("Failed to notify page translation state change", error),
+    )
   }
 
   // Notify content script in that specific tab
@@ -230,7 +233,7 @@ async function handleTranslateClick(tabId: number, tabUrl?: string) {
         : undefined,
     },
     tabId,
-  )
+  ).catch((error) => logger.warn("Failed to ask page translation manager to toggle", error))
 
   // Update menu title immediately
   await updateTranslateMenuTitle(tabId, newState)
@@ -267,7 +270,9 @@ async function handleSelectionReadAloudClick(
 
   const target = typeof info.frameId === "number" ? { tabId, frameId: info.frameId } : tabId
 
-  void sendMessage("readAloudSelectionFromContextMenu", { selectionText }, target)
+  void sendMessage("readAloudSelectionFromContextMenu", { selectionText }, target).catch((error) =>
+    logger.warn("Failed to trigger read aloud from context menu", error),
+  )
 }
 
 async function handleSelectionCustomActionClick(

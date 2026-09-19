@@ -3,6 +3,8 @@ import type { PlatformConfig } from "./platforms"
 import type { UniversalVideoAdapter } from "./universal-adapter"
 import debounce from "debounce"
 import { waitForElement } from "@/utils/dom/wait-for-element"
+import { isExtensionContextInvalidatedError } from "@/utils/error/extension-context"
+import { logger } from "@/utils/logger"
 import { bindSubtitlesToggleShortcut } from "./bind-subtitles-toggle-shortcut"
 import { mountSubtitlesSidebar } from "./renderer/mount-subtitles-sidebar"
 import { mountSubtitlesUI } from "./renderer/mount-subtitles-ui"
@@ -24,7 +26,22 @@ interface InitSiteSubtitlesOptions {
  * sites route between videos client-side, so a swap to a different video tears
  * the overlay down and re-mounts it into the new player element.
  */
-export async function initSiteSubtitles({
+export async function initSiteSubtitles(options: InitSiteSubtitlesOptions): Promise<void> {
+  try {
+    await startSiteSubtitles(options)
+  } catch (error) {
+    // A tab that outlived an extension reload keeps running this script against
+    // a dead runtime. Nothing here can recover in place - the next page load
+    // gets a live script again - so that failure is expected and stays quiet;
+    // anything else is a real failure worth reporting.
+    if (isExtensionContextInvalidatedError(error)) {
+      return
+    }
+    logger.error("Failed to start subtitles", error)
+  }
+}
+
+async function startSiteSubtitles({
   ctx,
   adapter,
   config,

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import { browser, storage } from "#imports"
 import { i18n } from "@/utils/i18n"
 
-const sendMessageMock = vi.fn<(...args: any[]) => any>()
+const sendMessageMock = vi.fn<(...args: any[]) => any>(() => Promise.resolve())
 const ensureInitializedConfigMock = vi.fn<(...args: any[]) => any>()
 const storageSetItemMock = vi.fn<(...args: any[]) => any>()
 const contextMenuClickListeners: Array<(info: any, tab?: any) => Promise<void> | void> = []
