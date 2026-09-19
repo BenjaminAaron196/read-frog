@@ -6,6 +6,7 @@ import {
   BLOCK_CONTENT_CLASS,
   INLINE_CONTENT_CLASS,
   NOTRANSLATE_CLASS,
+  REACT_SHADOW_HOST_CLASS,
 } from "@/utils/constants/dom-labels"
 import {
   isDontWalkIntoAndDontTranslateAsChildElement,
@@ -128,6 +129,13 @@ function configWithSiteRule(rule: NonNullable<Config["siteRules"]>["userRules"][
 }
 
 describe("isDontWalkIntoAndDontTranslateAsChildElement", () => {
+  it("should block the extension's own shadow hosts", () => {
+    const host = document.createElement("div")
+    host.classList.add(REACT_SHADOW_HOST_CLASS)
+    host.id = "read-frog-subtitles-sidebar-host"
+    expect(isDontWalkIntoAndDontTranslateAsChildElement(host, DEFAULT_CONFIG)).toBe(true)
+  })
+
   it("should return true for sr-only class", () => {
     const element = document.createElement("span")
     element.classList.add("sr-only")

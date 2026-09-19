@@ -7,6 +7,7 @@ import {
   INLINE_ATTRIBUTE,
   NOTRANSLATE_CLASS,
   PARAGRAPH_ATTRIBUTE,
+  REACT_SHADOW_HOST_CLASS,
   WALKED_ATTRIBUTE,
 } from "@/utils/constants/dom-labels"
 import { isNaturalBlockTransNode, isNaturalInlineTransNode } from "../filter"
@@ -387,6 +388,26 @@ describe("site rule node selectors", () => {
       expect(element).not.toHaveAttribute(WALKED_ATTRIBUTE)
       expect(element).not.toHaveAttribute(BLOCK_ATTRIBUTE)
       expect(element).not.toHaveAttribute(INLINE_ATTRIBUTE)
+    }
+    host.remove()
+  })
+
+  it("never walks into the extension's own shadow hosts", () => {
+    const host = fixture(`<p id="copy">page copy</p>`)
+    const panel = document.createElement("div")
+    panel.classList.add(REACT_SHADOW_HOST_CLASS)
+    panel.id = "read-frog-subtitles-sidebar-host"
+    const panelRoot = panel.attachShadow({ mode: "open" })
+    panelRoot.innerHTML = "<p>Learn</p><p>Transcript</p>"
+    host.append(panel)
+
+    walkAndLabelElement(host, "extension-panel", DEFAULT_CONFIG)
+
+    expect(host.querySelector("#copy")).toHaveAttribute(PARAGRAPH_ATTRIBUTE)
+    expect(panel).not.toHaveAttribute(WALKED_ATTRIBUTE)
+    for (const label of panelRoot.querySelectorAll("p")) {
+      expect(label).not.toHaveAttribute(WALKED_ATTRIBUTE)
+      expect(label).not.toHaveAttribute(PARAGRAPH_ATTRIBUTE)
     }
     host.remove()
   })

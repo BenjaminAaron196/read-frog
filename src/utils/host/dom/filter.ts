@@ -8,6 +8,7 @@ import {
   INLINE_ATTRIBUTE,
   INLINE_CONTENT_CLASS,
   NOTRANSLATE_CLASS,
+  REACT_SHADOW_HOST_CLASS,
 } from "@/utils/constants/dom-labels"
 import { DEFAULT_TAG_SETS } from "@/utils/constants/dom-rules"
 import { getEffectiveSiteRule } from "@/utils/site-rules/effective"
@@ -290,6 +291,12 @@ export function isDontWalkIntoAndDontTranslateAsChildElement(
   element: HTMLElement,
   config: Config,
 ): boolean {
+  // Read Frog's own UI - the subtitles sidebar and captions, toasts and
+  // popovers - lives in shadow hosts the extension renders. The walk descends
+  // into open shadow roots to reach shadow-DOM sites, so without this check the
+  // page translation translates the extension's own labels.
+  if (element.classList.contains(REACT_SHADOW_HOST_CLASS)) return true
+
   // Cheap structural predicates first; the getComputedStyle check runs last
   // because it can force a style recalculation, and the full-page walk
   // evaluates this predicate for every element (#1881).
