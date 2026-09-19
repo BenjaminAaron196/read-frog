@@ -1,4 +1,5 @@
 import type { PlatformConfig } from "@/entrypoints/subtitles.content/platforms"
+import { DEFAULT_CONTROLS_HEIGHT } from "@/utils/constants/subtitles"
 import { getReutersVideoId } from "@/utils/subtitles/video-id"
 
 /**
@@ -17,7 +18,16 @@ export function getReutersConfig(): PlatformConfig {
       nativeSubtitles: ".jw-captions",
     },
     events: {},
-    controls: { insertPosition: "end" },
+    controls: {
+      insertPosition: "end",
+      // The settings panel and the overlay sit above the button row, so they
+      // need its height while it is on screen; JW Player marks the player root
+      // while the bar is faded out.
+      measureHeight: (container) =>
+        container.querySelector(".jw-button-container")?.getBoundingClientRect().height ??
+        DEFAULT_CONTROLS_HEIGHT,
+      checkVisibility: (container) => !container.classList.contains("jw-flag-user-inactive"),
+    },
     supportsSidebar: true,
     getVideoId: getReutersVideoId,
   }

@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest"
+import { DEFAULT_CONTROLS_HEIGHT } from "@/utils/constants/subtitles"
 import { getBloombergAssetId } from "@/utils/subtitles/video-id"
 import { getBloombergConfig } from "../platforms/bloomberg/config"
 
@@ -42,5 +43,37 @@ describe("bloomberg platform config", () => {
   it("reads the asset id from the player root when the tech element matches too", () => {
     renderPlayer()
     expect(getBloombergAssetId()).toBe(ASSET_ID)
+  })
+
+  it("reports the control bar geometry the settings panel anchors to", () => {
+    renderPlayer()
+    const controls = getBloombergConfig().controls
+    const player = document.querySelector<HTMLElement>(`#${PLAYER_ID}`)!
+    const bar = document.querySelector<HTMLElement>(".vjs-control-bar")!
+    bar.getBoundingClientRect = () =>
+      ({
+        height: 54,
+        width: 800,
+        x: 0,
+        y: 585,
+        top: 585,
+        bottom: 639,
+        left: 0,
+        right: 800,
+      }) as DOMRect
+
+    expect(controls?.measureHeight?.(player)).toBe(54)
+    expect(controls?.checkVisibility?.(player)).toBe(true)
+
+    // Video.js marks the root while the bar is faded out.
+    player.classList.add("vjs-user-inactive")
+    expect(controls?.checkVisibility?.(player)).toBe(false)
+  })
+
+  it("falls back to the default controls height without a control bar", () => {
+    document.body.innerHTML = `<div class="video-js" id="${PLAYER_ID}"></div>`
+    expect(getBloombergConfig().controls?.measureHeight?.(document.body)).toBe(
+      DEFAULT_CONTROLS_HEIGHT,
+    )
   })
 })
