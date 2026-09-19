@@ -1,21 +1,27 @@
 import type { PlatformConfig } from "@/entrypoints/subtitles.content/platforms"
 import { DEFAULT_CONTROLS_HEIGHT } from "@/utils/constants/subtitles"
-import { getReutersVideoId } from "@/utils/subtitles/video-id"
+import {
+  REUTERS_ACTIVE_PLAYER_ATTRIBUTE,
+  getActiveReutersVideoId,
+} from "@/utils/subtitles/video-id"
+
+const ACTIVE_PLAYER_SELECTOR = `[${REUTERS_ACTIVE_PLAYER_ATTRIBUTE}]`
 
 /**
  * Reuters plays video through JW Player 8 (`renderCaptionsNatively: false`, so
- * captions render into its own `.jw-captions` layer) and reads the numeric ajo
- * video id from the page metadata rather than the player element. The button
- * mounts into `.jw-button-container` - the row that holds the player icons -
+ * captions render into its own `.jw-captions` layer) and resolves the ajo video
+ * id per player over the page bridge. The selectors target the player the
+ * overlay follows - a listing page carries one per video - and the button
+ * mounts into `.jw-button-container`, the row that holds the player icons,
  * because `.jw-controlbar` lays that row out on its own line.
  */
 export function getReutersConfig(): PlatformConfig {
   return {
     selectors: {
-      video: "video.jw-video",
-      playerContainer: ".jwplayer",
-      controlsBar: ".jw-controlbar .jw-button-container",
-      nativeSubtitles: ".jw-captions",
+      video: `${ACTIVE_PLAYER_SELECTOR} video.jw-video`,
+      playerContainer: ACTIVE_PLAYER_SELECTOR,
+      controlsBar: `${ACTIVE_PLAYER_SELECTOR} .jw-button-container`,
+      nativeSubtitles: `${ACTIVE_PLAYER_SELECTOR} .jw-captions`,
     },
     events: {},
     controls: {
@@ -29,6 +35,6 @@ export function getReutersConfig(): PlatformConfig {
       checkVisibility: (container) => !container.classList.contains("jw-flag-user-inactive"),
     },
     supportsSidebar: true,
-    getVideoId: getReutersVideoId,
+    getVideoId: getActiveReutersVideoId,
   }
 }

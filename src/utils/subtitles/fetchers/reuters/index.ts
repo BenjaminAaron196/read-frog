@@ -3,8 +3,9 @@ import type { SubtitlesFetcher } from "../types"
 import { backgroundFetch } from "@/utils/content-script/background-fetch-client"
 import { i18n } from "@/utils/i18n"
 import { OverlaySubtitlesError } from "@/utils/subtitles/errors"
-import { getReutersVideoId } from "@/utils/subtitles/video-id"
+import { getActiveReutersPlayer, getReutersVideoId } from "@/utils/subtitles/video-id"
 import { parseVttCues } from "../parsers/vtt"
+import { resolveReutersPlayerVideoId } from "./player-item"
 
 /**
  * ajo, Reuters' video CDN, publishes the caption rendition declared by the HLS
@@ -20,7 +21,7 @@ export class ReutersSubtitlesFetcher implements SubtitlesFetcher {
   private cachedVideoId: string | null = null
 
   async fetch(): Promise<SubtitlesFragment[]> {
-    const videoId = getReutersVideoId()
+    const videoId = await this.resolveCaptionVideoId()
     if (!videoId) {
       throw new OverlaySubtitlesError(i18n.t("subtitles.errors.videoNotFound"))
     }
@@ -38,7 +39,7 @@ export class ReutersSubtitlesFetcher implements SubtitlesFetcher {
   }
 
   async hasAvailableSubtitles(): Promise<boolean> {
-    const videoId = getReutersVideoId()
+    const videoId = await this.resolveCaptionVideoId()
     if (!videoId) {
       return false
     }
@@ -49,12 +50,29 @@ export class ReutersSubtitlesFetcher implements SubtitlesFetcher {
     if (this.cachedVideoId === null || this.subtitles.length === 0) {
       return false
     }
-    return this.cachedVideoId === getReutersVideoId()
+    return this.cachedVideoId === (await this.resolveCaptionVideoId())
   }
 
   cleanup(): void {
     this.subtitles = []
     this.cachedVideoId = null
+  }
+
+  /**
+   * Reuters' listings hold several players, so the caption id has to come from
+   * the player the overlay follows rather than from the page. The page-level id
+   * (article pages, or when the player cannot be asked) stays as the fallback.
+   */
+  private async resolveCaptionVideoId(): Promise<string | null> {
+    const player = getActiveReutersPlayer()
+    if (player) {
+      const fromPlayer = await resolveReutersPlayerVideoId(player)
+      if (fromPlayer) {
+        return fromPlayer
+      }
+    }
+
+    return getReutersVideoId()
   }
 
   // Reuters ships captions for most - not all - videos, and some carry an empty

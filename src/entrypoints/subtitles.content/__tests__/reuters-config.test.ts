@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest"
 import { DEFAULT_CONTROLS_HEIGHT } from "@/utils/constants/subtitles"
+import { setActiveReutersPlayer } from "@/utils/subtitles/video-id"
 import { getReutersConfig } from "../platforms/reuters/config"
 
 /**
@@ -26,10 +27,11 @@ function renderPlayer() {
       left: 0,
       right: 800,
     }) as DOMRect
+  setActiveReutersPlayer(document.querySelector<HTMLElement>(".jwplayer")!)
 }
 
 describe("reuters platform config", () => {
-  it("mounts the translate button inside the player's button row", () => {
+  it("mounts the translate button inside the followed player's button row", () => {
     renderPlayer()
     const { controlsBar, video, playerContainer } = getReutersConfig().selectors
 
@@ -55,5 +57,16 @@ describe("reuters platform config", () => {
     expect(getReutersConfig().controls?.measureHeight?.(document.body)).toBe(
       DEFAULT_CONTROLS_HEIGHT,
     )
+  })
+
+  it("ignores players the overlay does not follow", () => {
+    renderPlayer()
+    const { video } = getReutersConfig().selectors
+    const second = document.createElement("div")
+    second.className = "jwplayer"
+    second.innerHTML = `<video class="jw-video"></video>`
+    document.body.append(second)
+
+    expect(document.querySelector(video)?.closest(".jwplayer")?.id).toBe("player-1")
   })
 })

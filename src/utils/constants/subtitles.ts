@@ -48,6 +48,12 @@ export const ENSURE_SUBTITLES_REQUEST_TYPE = "READ_FROG_ENSURE_SUBTITLES"
 export const ENSURE_SUBTITLES_RESPONSE_TYPE = "READ_FROG_ENSURE_SUBTITLES_DONE"
 export const POST_MESSAGE_TIMEOUT_MS = 6000
 
+// JW Player bridge (Reuters). The player instance - and with it the ajo video
+// id of whatever the player is showing - only exists in the page world.
+export const JW_PLAYER_ITEM_REQUEST_TYPE = "READ_FROG_GET_JW_PLAYER_ITEM"
+export const JW_PLAYER_ITEM_RESPONSE_TYPE = "READ_FROG_JW_PLAYER_ITEM"
+export const JW_PLAYER_ITEM_TIMEOUT_MS = 1500
+
 // YouTube player wait constants
 export const MAX_PLAYER_WAIT_ATTEMPTS = 50
 export const PLAYER_WAIT_INTERVAL_MS = 100
