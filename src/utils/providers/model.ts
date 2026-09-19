@@ -89,7 +89,10 @@ function getAzureApiMode(providerConfig: LLMProviderConfig): AzureApiMode {
   return apiMode === "chat" ? "chat" : DEFAULT_AZURE_API_MODE
 }
 
-async function getLanguageModelById(providerId: string) {
+async function getLanguageModelById(
+  providerId: string,
+  options?: { supportsStructuredOutputs?: boolean },
+) {
   const config = await storage.getItem<Config>(`local:${CONFIG_STORAGE_KEY}`)
   if (!config) {
     throw new Error("Config not found")
@@ -101,7 +104,7 @@ async function getLanguageModelById(providerId: string) {
     throw new Error(`Provider ${providerId} not found`)
   }
 
-  return getLanguageModelForConfig(providerConfig)
+  return getLanguageModelForConfig(providerConfig, options)
 }
 
 /**
@@ -112,7 +115,10 @@ async function getLanguageModelById(providerId: string) {
  * up edits made after the ref was captured, so the model would come from the
  * new row while the params derived from the ref came from the old one.
  */
-export function getLanguageModelForConfig(providerConfig: LLMProviderConfig) {
+export function getLanguageModelForConfig(
+  providerConfig: LLMProviderConfig,
+  options: { supportsStructuredOutputs?: boolean } = {},
+) {
   const headers = getProviderHeadersWithOverride(providerConfig.provider, providerConfig.headers)
   const providerSpecificSettings = getProviderSpecificSettings(providerConfig)
 
@@ -121,7 +127,7 @@ export function getLanguageModelForConfig(providerConfig: LLMProviderConfig) {
       createOpenAICompatible({
         name: matchedConfig.provider,
         baseURL: matchedConfig.baseURL,
-        supportsStructuredOutputs: true,
+        supportsStructuredOutputs: options.supportsStructuredOutputs ?? true,
         ...(matchedConfig.apiKey && { apiKey: matchedConfig.apiKey }),
         ...(headers && { headers }),
       }),
@@ -161,6 +167,9 @@ export function getLanguageModelForConfig(providerConfig: LLMProviderConfig) {
   return provider.languageModel(modelId)
 }
 
-export async function getModelById(providerId: string) {
-  return getLanguageModelById(providerId)
+export async function getModelById(
+  providerId: string,
+  options?: { supportsStructuredOutputs?: boolean },
+) {
+  return getLanguageModelById(providerId, options)
 }

@@ -35,7 +35,10 @@ import { BACKGROUND_STREAM_PORTS } from "@/types/background-stream"
 import { isLLMProviderConfig, llmProviderConfigItemSchema } from "@/types/config/provider"
 import { createStructuredObjectSchema } from "@/utils/ai/structured-object-schema"
 import { BUILT_IN_AI_PROVIDER_IDS } from "@/utils/constants/provider-ids"
+import { isAbortLikeError } from "@/utils/error/abort"
+import { runWithApiRetry } from "@/utils/error/api-retry"
 import { extractAISDKErrorMessage } from "@/utils/error/extract-message"
+import { isStructuredOutputUnsupportedError } from "@/utils/error/structured-output"
 import { hostedTextStreamRouteSchema, requireHostedFeature } from "@/utils/hosted-ai/routing"
 import { i18n } from "@/utils/i18n"
 import { logger } from "@/utils/logger"
@@ -61,13 +64,6 @@ type HostedStreamFn = (
 
 function createStreamAbortError(message: string) {
   return new DOMException(message, "AbortError")
-}
-
-function isAbortLikeError(error: unknown) {
-  return (
-    (error instanceof DOMException && error.name === "AbortError") ||
-    (error instanceof Error && error.name === "AbortError")
-  )
 }
 
 const streamPortStartEnvelopeSchema = z.object({
@@ -240,38 +236,51 @@ function createStreamPortHandler<TSerializablePayload, TResponse>(
       const startMessage = parseResult.message
       streamRequestId = startMessage.streamRequestId
       hasStarted = true
-      let streamError: unknown
+      // A retry after the first chunk would append a second translation to the
+      // one already on screen, so the retry budget is spent before that point.
+      let hasPostedChunk = false
 
       try {
-        const result = await streamFn(startMessage.payload, {
-          signal: abortController.signal,
-          onChunk: (snapshot) => {
-            safePost({ type: "chunk", data: snapshot })
-          },
-          onError: (error) => {
-            if (streamError === undefined) {
-              streamError = error
+        const result = await runWithApiRetry(
+          async () => {
+            // A recovered attempt must not poison the next attempt's result.
+            let streamError: unknown
+            try {
+              const completedSnapshot = await streamFn(startMessage.payload, {
+                signal: abortController.signal,
+                onChunk: (snapshot) => {
+                  hasPostedChunk = true
+                  safePost({ type: "chunk", data: snapshot })
+                },
+                onError: (error) => {
+                  streamError ??= error
+                },
+              })
+              if (streamError !== undefined) {
+                throw streamError
+              }
+              return completedSnapshot
+            } catch (error) {
+              // Keep the provider's status and body for retry classification.
+              throw streamError ?? error
             }
           },
-        })
-
-        if (streamError !== undefined) {
-          throw streamError instanceof Error
-            ? new Error(streamError.message, { cause: streamError })
-            : new Error(typeof streamError === "string" ? streamError : "Unknown stream error")
-        }
+          {
+            signal: abortController.signal,
+            canRetry: () => !hasPostedChunk,
+          },
+        )
 
         if (!abortController.signal.aborted) {
           safePost({ type: "done", data: result })
         }
       } catch (error) {
-        const finalError = streamError ?? error
-        if (abortController.signal.aborted || isAbortLikeError(finalError)) {
+        if (abortController.signal.aborted || isAbortLikeError(error)) {
           return
         }
 
-        logger.error("[Background] Stream Function failed", finalError)
-        safePost({ type: "error", error: { message: extractAISDKErrorMessage(finalError) } })
+        logger.error("[Background] Stream Function failed", error)
+        safePost({ type: "error", error: { message: extractAISDKErrorMessage(error) } })
       } finally {
         cleanup()
         try {
@@ -672,6 +681,10 @@ async function createLocalTextPartStream(
     ...(providerConfig ? buildLocalGenerateTextParams(providerConfig) : {}),
     model,
     abortSignal: signal,
+    // Retries live one level up (`runWithApiRetry`), which rethrows the
+    // provider's own error: the SDK's wrapper replaces a 429's "no available
+    // channel" body with the string "AI_APICallError".
+    maxRetries: 0,
     onError: ({ error }) => {
       onError?.(error)
     },
@@ -834,11 +847,12 @@ async function createLocalStructuredObjectPartStream<TOutput extends Record<stri
   },
   objectSchema: z.ZodType<TOutput>,
   options: StreamRuntimeOptions<BackgroundStructuredObjectStreamSnapshot> = {},
+  modelOptions: { supportsStructuredOutputs?: boolean } = { supportsStructuredOutputs: true },
 ): Promise<AsyncIterable<unknown>> {
   const { providerId, outputSchema: _outputSchema, ...streamParams } = serializablePayload
   const { signal, onError } = options
 
-  const model = await getModelById(providerId)
+  const model = await getModelById(providerId, modelOptions)
   const result = streamText({
     ...(streamParams as Parameters<typeof streamText>[0]),
     model,
@@ -846,6 +860,9 @@ async function createLocalStructuredObjectPartStream<TOutput extends Record<stri
       schema: objectSchema,
     }),
     abortSignal: signal,
+    // Same reasoning as the text path: retries belong to the caller, which
+    // needs the provider's own error object to decide what to do next.
+    maxRetries: 0,
     onError: ({ error }) => {
       onError?.(error)
     },
@@ -978,16 +995,55 @@ export async function runNoteSuggestionStreamInBackground(
     return createStreamSnapshot(envelope.data, hostedSnapshot.thinking)
   }
 
-  const partStream = await createLocalStructuredObjectPartStream(
-    serializablePayload,
-    noteSuggestionEnvelopeSchema,
-    { signal, onError },
-  )
+  const runLocalStructuredSuggestion = async () => {
+    // No `onError` here: a refusal this attempt hits is retried below, and an
+    // error that gets recovered from must not reach the client. Anything that
+    // is not a refusal propagates through the throw instead.
+    const partStream = await createLocalStructuredObjectPartStream(
+      serializablePayload,
+      noteSuggestionEnvelopeSchema,
+      { signal },
+    )
 
-  return consumeStructuredObjectPartStream(partStream, {
-    objectSchema: noteSuggestionEnvelopeSchema,
-    signal,
-  })
+    return await consumeStructuredObjectPartStream(partStream, {
+      objectSchema: noteSuggestionEnvelopeSchema,
+      signal,
+    })
+  }
+
+  /**
+   * Same request as plain text: asking for the schema through `response_format`
+   * is what some relays refuse, and they refuse it in every flavour (strict
+   * schema and `json_object` alike), so the envelope has to be parsed from the
+   * model's own reply instead.
+   */
+  const runLocalPlainTextSuggestion = async () => {
+    const partStream = await createLocalTextPartStream(
+      { ...serializablePayload, providerKind: "local" },
+      { signal, onError },
+    )
+
+    return await consumeStructuredObjectPartStream(partStream, {
+      objectSchema: noteSuggestionEnvelopeSchema,
+      signal,
+    })
+  }
+
+  try {
+    return await runLocalStructuredSuggestion()
+  } catch (error) {
+    // A relay that refuses `response_format` would otherwise make the feature
+    // look broken - the failure is silent by design, so nobody would see why
+    // the card never appears.
+    if (!isStructuredOutputUnsupportedError(error)) {
+      throw error
+    }
+
+    logger.info(
+      "[Background] Provider refused response_format; retrying the note suggestion as plain text",
+    )
+    return await runLocalPlainTextSuggestion()
+  }
 }
 
 const parseStreamTextStartMessage =

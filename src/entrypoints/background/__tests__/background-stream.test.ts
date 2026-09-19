@@ -73,6 +73,8 @@ vi.mock("@/utils/orpc/background-client", () => ({
 vi.mock("@/utils/logger", () => ({
   logger: {
     error: loggerErrorMock,
+    info: vi.fn<(...args: any[]) => any>(),
+    warn: vi.fn<(...args: any[]) => any>(),
   },
 }))
 
@@ -177,6 +179,103 @@ describe("background-stream", () => {
     expect(getModelByIdMock).not.toHaveBeenCalled()
   })
 
+  it("surfaces the provider's own error text instead of the SDK wrapper", async () => {
+    getModelByIdMock.mockResolvedValue("mock-model")
+    const providerError = Object.assign(
+      new Error("Invalid URL (POST /v1/chat/completions/chat/completions)"),
+      {
+        name: "AI_APICallError",
+        statusCode: 400,
+        responseBody:
+          '{"error":{"message":"Invalid URL (POST /v1/chat/completions/chat/completions)"}}',
+      },
+    )
+    streamTextMock.mockReturnValue({
+      stream: (async function* () {
+        if (providerError) {
+          throw providerError
+        }
+        yield { type: "text-delta", text: "" }
+      })(),
+    })
+
+    const { handleStreamTextPort } = await import("../background-stream")
+    const mockPort = createMockPort("stream-text")
+    handleStreamTextPort(mockPort.port as never)
+    await mockPort.emitMessage({
+      type: "start",
+      streamRequestId: "provider-error",
+      payload: {
+        providerKind: "local",
+        providerId: "openai-default",
+        instructions: "Translate",
+        prompt: "Hello",
+      },
+    })
+
+    const errorMessage = mockPort.postMessage.mock.calls
+      .map(([message]) => message)
+      .find((message) => message?.type === "error")
+    expect(errorMessage.error.message).toContain(
+      "Invalid URL (POST /v1/chat/completions/chat/completions)",
+    )
+    expect(errorMessage.error.message).not.toContain("AI_APICallError")
+  })
+
+  it("does not report a refusal it recovered from as a failure", async () => {
+    const refusal = new Error(
+      "[invalid_request_error] This response_format type is unavailable now",
+    )
+    getModelByIdMock.mockResolvedValue("mock-model")
+    streamTextMock.mockImplementation(
+      (options: { output?: unknown; onError?: (event: { error: unknown }) => void }) => ({
+        stream: (async function* () {
+          if (options.output !== undefined) {
+            options.onError?.({ error: refusal })
+            yield { type: "error", error: refusal }
+            return
+          }
+          yield {
+            type: "text-delta",
+            text: JSON.stringify({
+              summaryFieldName: null,
+              notes: [{ fields: [{ name: "Term", value: "ephemeral" }] }],
+            }),
+          }
+          yield { type: "finish", finishReason: "stop" }
+        })(),
+      }),
+    )
+
+    // Import after resetModules so this case owns the mocked stream dependencies.
+    const { handleStreamNoteSuggestionPort } = await import("../background-stream")
+    const mockPort = createMockPort("stream-note-suggestion")
+    handleStreamNoteSuggestionPort(mockPort.port as never)
+    await mockPort.emitMessage({
+      type: "start",
+      streamRequestId: "recovered-refusal",
+      payload: {
+        providerId: "openai-default",
+        instructions: "Suggest words",
+        prompt: "Fence posts",
+      },
+    })
+
+    const posted = mockPort.postMessage.mock.calls.map(([message]) => message)
+    expect(posted).toContainEqual(
+      expect.objectContaining({
+        type: "done",
+        data: expect.objectContaining({
+          output: {
+            summaryFieldName: null,
+            notes: [{ fields: [{ name: "Term", value: "ephemeral" }] }],
+          },
+        }),
+      }),
+    )
+    expect(posted.some((message) => message?.type === "error")).toBe(false)
+  })
+
   it("streams structured object output from background", async () => {
     getModelByIdMock.mockResolvedValue("mock-model")
     streamTextMock.mockReturnValue({
@@ -211,7 +310,9 @@ describe("background-stream", () => {
       },
     )
 
-    expect(getModelByIdMock).toHaveBeenCalledWith("openai-default")
+    expect(getModelByIdMock).toHaveBeenCalledWith("openai-default", {
+      supportsStructuredOutputs: true,
+    })
     expect(streamTextMock).toHaveBeenCalledWith(
       expect.objectContaining({
         model: "mock-model",
@@ -964,6 +1065,56 @@ describe("background-stream", () => {
     ])
   })
 
+  it.each([false, true])(
+    "reports only the final retry outcome (final attempt fails: %s)",
+    async (fails) => {
+      const transientError = Object.assign(new Error("Bad Gateway"), { statusCode: 502 })
+      const finalError = Object.assign(new Error("Invalid model"), { statusCode: 400 })
+      getModelByIdMock.mockResolvedValue("mock-model")
+      streamTextMock
+        .mockImplementationOnce((options: { onError?: (event: { error: unknown }) => void }) => ({
+          stream: (async function* () {
+            options.onError?.({ error: transientError })
+            yield { type: "error", error: transientError }
+          })(),
+        }))
+        .mockImplementation((options: { onError?: (event: { error: unknown }) => void }) => ({
+          stream: (async function* () {
+            if (fails) {
+              options.onError?.({ error: finalError })
+              yield { type: "error", error: finalError }
+            } else {
+              yield { type: "text-delta", text: "你好" }
+              yield { type: "finish", finishReason: "stop" }
+            }
+          })(),
+        }))
+
+      // Import after resetModules so this case owns the mocked stream dependencies.
+      const { handleStreamTextPort } = await import("../background-stream")
+      const mockPort = createMockPort("stream-text")
+      handleStreamTextPort(mockPort.port as never)
+      await mockPort.emitMessage({
+        type: "start",
+        streamRequestId: "retried-text",
+        payload: { providerKind: "local", providerId: "openai-default", prompt: "Hello" },
+      })
+
+      const terminal = mockPort.postMessage.mock.calls
+        .map(([message]) => message)
+        .filter((message) => message.type === "done" || message.type === "error")
+      expect(terminal).toEqual([
+        fails
+          ? { type: "error", streamRequestId: "retried-text", error: { message: "Invalid model" } }
+          : {
+              type: "done",
+              streamRequestId: "retried-text",
+              data: { output: "你好", thinking: { status: "complete", text: "" } },
+            },
+      ])
+    },
+  )
+
   it("prefers stream onError root cause and posts error once", async () => {
     getModelByIdMock.mockResolvedValue("mock-model")
     const rootCause = Object.assign(new Error("Incorrect API key provided"), {
@@ -1209,7 +1360,9 @@ describe("background-stream", () => {
       prompt: "Selection context",
     })
 
-    expect(getModelByIdMock).toHaveBeenCalledWith("openai-default")
+    expect(getModelByIdMock).toHaveBeenCalledWith("openai-default", {
+      supportsStructuredOutputs: true,
+    })
     expect(streamTextMock).toHaveBeenCalledWith(
       expect.objectContaining({
         model: "mock-model",
