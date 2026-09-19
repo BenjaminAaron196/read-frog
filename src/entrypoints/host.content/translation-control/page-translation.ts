@@ -1175,8 +1175,14 @@ export class PageTranslationManager implements IPageTranslationManager {
    * Recursively find and observe shadow roots and iframes in an element and its descendants
    * These can't be found as top level paragraph elements because isolated shadow roots and iframes are not
    * considered as part of the document.
+   *
+   * Read Frog's own shadow hosts are excluded: the panels re-render constantly,
+   * and a walk that starts from a container inside such a root never sees the
+   * host-level blocked check.
    */
   private observeIsolatedDescendantsMutations(element: HTMLElement): void {
+    if (element.classList.contains(REACT_SHADOW_HOST_CLASS)) return
+
     // Check if this element has a shadow root
     if (element.shadowRoot) {
       for (const child of element.shadowRoot.children) {

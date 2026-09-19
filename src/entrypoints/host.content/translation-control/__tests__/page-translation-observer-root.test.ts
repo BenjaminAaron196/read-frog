@@ -2,6 +2,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { DEFAULT_CONFIG } from "@/utils/constants/config"
+import { REACT_SHADOW_HOST_CLASS } from "@/utils/constants/dom-labels"
 import { PageTranslationManager } from "../page-translation"
 
 const {
@@ -134,6 +135,38 @@ describe("pageTranslationManager mutation observer root", () => {
       DEFAULT_CONFIG,
       expect.anything(),
     )
+
+    manager.stop()
+  })
+
+  it("does not observe inside Read Frog's own shadow hosts", async () => {
+    const observedTargets: Node[] = []
+    class RecordingMutationObserver {
+      observe = (target: Node) => {
+        observedTargets.push(target)
+      }
+      disconnect = vi.fn<(...args: any[]) => any>()
+      takeRecords = vi.fn<(...args: any[]) => any>(() => [])
+    }
+    vi.stubGlobal("MutationObserver", RecordingMutationObserver)
+
+    const panelHost = document.createElement("div")
+    panelHost.classList.add(REACT_SHADOW_HOST_CLASS)
+    const panelRoot = panelHost.attachShadow({ mode: "open" })
+    panelRoot.innerHTML = "<p>Learn</p>"
+    document.body.appendChild(panelHost)
+
+    const manager = new PageTranslationManager()
+    await manager.start()
+    await flushDomUpdates()
+
+    // A walk that starts from a container INSIDE the panel root bypasses the
+    // host-level blocked check, so the panel's own churn must never be
+    // observed.
+    expect(
+      observedTargets.filter((target) => target === panelRoot || panelRoot.contains(target)),
+    ).toHaveLength(0)
+    expect(observedTargets).toContain(document.documentElement)
 
     manager.stop()
   })
