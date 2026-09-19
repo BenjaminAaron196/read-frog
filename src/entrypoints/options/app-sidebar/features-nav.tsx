@@ -166,6 +166,17 @@ export function FeaturesNav() {
 
           <SidebarMenuItem>
             <SidebarMenuButton
+              render={<Link to="/word-book" />}
+              isActive={pathname === "/word-book"}
+              tooltip={i18n.t("wordBook.panel.title")}
+            >
+              <Icon icon="tabler:notebook" />
+              <span>{i18n.t("wordBook.panel.title")}</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+
+          <SidebarMenuItem>
+            <SidebarMenuButton
               render={
                 <a
                   href={browser.runtime.getURL(TRANSLATION_HUB_PAGE_PATH)}

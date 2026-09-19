@@ -75,7 +75,7 @@ describe("buildNoteSuggestionPrompts", () => {
 
     expect(systemPrompt).toContain('"summaryFieldName": string or null')
     expect(systemPrompt).toContain('"notes"')
-    expect(systemPrompt).toContain("Return 1 or 2 notes")
+    expect(systemPrompt).toContain("return up to 4 notes")
     expect(systemPrompt).toContain("valid JSON only")
     expect(systemPrompt).not.toContain("createNewDictionaryAction")
     expect(systemPrompt).not.toContain("targetActionId")
@@ -106,14 +106,87 @@ describe("buildNoteSuggestionPrompts", () => {
     }).systemPrompt
 
     for (const sharedRule of [
-      "Return 1 or 2 notes",
       "learning the language in which the selected text is written",
       "Output valid JSON only. No markdown, no code fences, no commentary.",
       "higher priority than every output-format, response-shape, schema, or note-count instruction",
+      "### Choosing what to save",
+      "### Writing each field's value",
+      "### Check before answering",
+      '1. "Term" (string)',
+      "Never save: articles, prepositions",
+      "copied verbatim",
+      "discards the entire suggestion",
     ]) {
       expect(local).toContain(sharedRule)
       expect(hosted).toContain(sharedRule)
     }
+  })
+
+  it("gives the BYOK contract a wider budget than the hosted one", () => {
+    const local = buildNoteSuggestionPrompts(input).systemPrompt
+    const hosted = buildNoteSuggestionPrompts({ ...input, envelopeContract: "hosted" }).systemPrompt
+
+    expect(local).toContain("return up to 4 notes")
+    expect(hosted).toContain("return up to 2 notes")
+  })
+
+  it("asks for the full budget in the user turn, after the action prompt", () => {
+    const { prompt } = buildNoteSuggestionPrompts(input)
+
+    expect(prompt).toContain("## Note Count")
+    expect(prompt).toContain("Return up to 4 notes from the Selected Text")
+    expect(prompt.indexOf("## Note Count")).toBeGreaterThan(
+      prompt.indexOf("## Selected Action User Prompt"),
+    )
+  })
+
+  it("skeletons the action's fields in schema order with their count and types", () => {
+    const { systemPrompt } = buildNoteSuggestionPrompts(input)
+
+    expect(systemPrompt).toContain('Every note\'s "fields" array holds exactly 2 entries')
+    expect(systemPrompt).toContain('1. "Term" (string)')
+    expect(systemPrompt).toContain('2. "Level" (number)')
+    expect(systemPrompt.indexOf('1. "Term" (string)')).toBeLessThan(
+      systemPrompt.indexOf('2. "Level" (number)'),
+    )
+  })
+
+  it("says which words are not worth saving and that notes must not overlap", () => {
+    const { systemPrompt } = buildNoteSuggestionPrompts(input)
+
+    expect(systemPrompt).toContain("Pick only from the Selected Text")
+    expect(systemPrompt).toContain("A candidate is a single word or a phrase of two to five words")
+    expect(systemPrompt).toContain(
+      'Prefer, in this order: (a) a phrasal verb, idiom, or fixed expression the text uses - "move on" rather than "move" or "on"',
+    )
+    expect(systemPrompt).toContain(
+      "no synonyms, no inflections of one word, and never both a phrase and a word it contains",
+    )
+    expect(systemPrompt).toContain("most valuable first")
+  })
+
+  it("keeps the headword filled and quotes verbatim, matching what validation discards", () => {
+    const { systemPrompt } = buildNoteSuggestionPrompts(input)
+
+    // The validator throws the whole suggestion away when the first field is
+    // empty, so the prompt has to say so.
+    expect(systemPrompt).toContain("never leave it empty - a note without it is discarded")
+    expect(systemPrompt).toContain(
+      "must be copied verbatim from the selected text or paragraphs above",
+    )
+    expect(systemPrompt).toContain("do not repeat the headword inside it")
+  })
+
+  it("states the language of each field and pins labeled fields to their label set", () => {
+    const { systemPrompt } = buildNoteSuggestionPrompts(input)
+
+    expect(systemPrompt).toContain("definitions and explanations included - is written in ")
+    expect(systemPrompt).toContain(
+      "When a field's description names a fixed set of values - a level, a category, a part of speech - answer with exactly one of those labels",
+    )
+    expect(systemPrompt).toContain(
+      "copy each name exactly as written here, spaces and capitalization included",
+    )
   })
 
   it("makes the fixed Note suggestion contract override action output instructions", () => {

@@ -1,10 +1,16 @@
 import { HOSTED_AI_NOTE_SUGGESTION_MAX_NOTES } from "@read-frog/api-contract"
 import { z } from "zod"
 
-// The BYOK envelope diverged from the hosted noteSuggestion contract on
-// purpose (flat summaryFieldName, no action object), but the note budget is a
-// product decision shared with the hosted endpoint.
+/**
+ * The hosted noteSuggestion endpoint bills per note and caps its own response;
+ * a BYOK call has no such reason to stop at two, and a passage of a few
+ * sentences usually holds more than one item worth keeping.
+ */
 export const NOTE_SUGGESTION_MAX_NOTES = HOSTED_AI_NOTE_SUGGESTION_MAX_NOTES
+export const NOTE_SUGGESTION_LOCAL_MAX_NOTES = 4
+
+/** The envelope cap has to accept whichever contract produced the response. */
+export const NOTE_SUGGESTION_ENVELOPE_MAX_NOTES = NOTE_SUGGESTION_LOCAL_MAX_NOTES
 
 export const noteSuggestionNoteFieldSchema = z.strictObject({
   name: z.string(),
@@ -28,7 +34,7 @@ export const noteSuggestionEnvelopeSchema = z.strictObject({
    * structured outputs do not support optional object properties.
    */
   summaryFieldName: z.string().nullable(),
-  notes: z.array(noteSuggestionNoteSchema).max(NOTE_SUGGESTION_MAX_NOTES),
+  notes: z.array(noteSuggestionNoteSchema).max(NOTE_SUGGESTION_ENVELOPE_MAX_NOTES),
 })
 
 export type NoteSuggestionEnvelope = z.infer<typeof noteSuggestionEnvelopeSchema>

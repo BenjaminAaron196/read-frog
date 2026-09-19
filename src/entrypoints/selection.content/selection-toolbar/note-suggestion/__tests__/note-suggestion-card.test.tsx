@@ -13,8 +13,13 @@ import { i18n } from "@/utils/i18n"
 
 const mocks = vi.hoisted(() => ({
   save: vi.fn<(...args: any[]) => any>(),
+  sendMessage: vi.fn<(...args: any[]) => any>(),
   toastAdd: vi.fn<(...args: any[]) => any>(),
   track: vi.fn<(...args: any[]) => any>(),
+}))
+
+vi.mock("@/utils/message", () => ({
+  sendMessage: (...args: any[]) => mocks.sendMessage(...args),
 }))
 
 vi.mock(
@@ -32,7 +37,7 @@ vi.mock("@/utils/note-suggestion/analytics", () => ({
   trackNoteSuggestionEvent: (...args: any[]) => mocks.track(...args),
 }))
 
-const { NoteSuggestionCard } = await import("../note-suggestion-card")
+const { NoteSuggestionCard, NoteSuggestionPendingCard } = await import("../note-suggestion-card")
 
 function wrapper(store: ReturnType<typeof createStore>) {
   return function Wrapper({ children }: { children: ReactNode }) {
@@ -107,6 +112,10 @@ function renderCard(
     <NoteSuggestionCard
       suggestion={createSuggestion(actionSnapshot, notes)}
       markShownOnce={() => false}
+      selectionText="ephemeral"
+      contextText="An ephemeral pleasure."
+      sourceTitle="Example article"
+      sourceUrl="https://example.com/article"
     />,
     { wrapper: wrapper(store) },
   )
@@ -273,5 +282,69 @@ describe("NoteSuggestionCard", () => {
       ).toEqual(expectedNoteSuggestion)
     })
     await storage.removeItem("local:config")
+  })
+
+  it("saves the checked notes into the word book when the Notion button is used", async () => {
+    const action = createAction()
+    const store = createStoreWithAction(action)
+    mocks.sendMessage.mockResolvedValue({
+      created: true,
+      record: { syncStatus: "pending", syncError: "notion_not_configured" },
+    })
+    renderCard(store, action, [
+      { Term: "ephemeral", Definition: "lasting a very short time" },
+      { Term: "perennial", Definition: "lasting a long time" },
+    ])
+
+    fireEvent.click(screen.getByRole("checkbox", { name: /perennial/ }))
+    fireEvent.click(screen.getByRole("button", { name: i18n.t("noteSuggestion.saveToNotion") }))
+
+    await waitFor(() => expect(mocks.sendMessage).toHaveBeenCalledTimes(1))
+    expect(mocks.sendMessage).toHaveBeenCalledWith("wordBookAdd", {
+      word: "ephemeral",
+      definition: "Definition: lasting a very short time",
+      context: "An ephemeral pleasure.",
+      sourceTitle: "Example article",
+      sourceUrl: "https://example.com/article",
+    })
+    // The unchecked note is not written, and the Notebase flow stays untouched.
+    expect(mocks.save).not.toHaveBeenCalled()
+    await waitFor(() =>
+      expect(mocks.track).toHaveBeenCalledWith("suggestion_accepted", expect.anything()),
+    )
+  })
+
+  it("shows a loading card while the suggestion is still being written", () => {
+    const store = createStoreWithAction(createAction())
+    render(<NoteSuggestionPendingCard mode="loading" />, { wrapper: wrapper(store) })
+
+    expect(screen.getByText(i18n.t("noteSuggestion.loading"))).toBeInTheDocument()
+    expect(
+      screen.queryByRole("button", { name: i18n.t("noteSuggestion.save") }),
+    ).not.toBeInTheDocument()
+  })
+
+  it("shows why the suggestion failed instead of rendering nothing", () => {
+    const store = createStoreWithAction(createAction())
+    render(<NoteSuggestionPendingCard mode="error" message="No available channel for model x" />, {
+      wrapper: wrapper(store),
+    })
+
+    expect(screen.getByText(/No available channel for model x/)).toBeInTheDocument()
+  })
+
+  it("hides the Notion button when the word book is disabled", () => {
+    const action = createAction()
+    const store = createStoreWithAction(action)
+    store.set(configAtom, {
+      ...store.get(configAtom),
+      wordBook: { ...DEFAULT_CONFIG.wordBook, enabled: false },
+    })
+    renderCard(store, action)
+
+    expect(
+      screen.queryByRole("button", { name: i18n.t("noteSuggestion.saveToNotion") }),
+    ).not.toBeInTheDocument()
+    expect(screen.getByRole("button", { name: i18n.t("noteSuggestion.save") })).toBeInTheDocument()
   })
 })

@@ -68,7 +68,10 @@ import {
   createSelectionToolbarRuntimeError,
   isAbortError,
 } from "../inline-error"
-import { NoteSuggestionCard } from "../note-suggestion/note-suggestion-card"
+import {
+  NoteSuggestionCard,
+  NoteSuggestionPendingCard,
+} from "../note-suggestion/note-suggestion-card"
 import { useNoteSuggestion } from "../note-suggestion/use-note-suggestion"
 import { useSelectionOpenRequestResolver } from "../use-selection-open-request"
 import { TargetLanguageSelector } from "./target-language-selector"
@@ -116,6 +119,7 @@ async function getSelectionWebPagePromptContext(
 
 async function translateWithTextStream({
   preparedText,
+  surroundingText,
   providerId,
   providerConfig,
   translateRequest,
@@ -123,6 +127,7 @@ async function translateWithTextStream({
   registerAbortController,
 }: {
   preparedText: string
+  surroundingText?: string
   providerId: string
   providerConfig: LLMProviderConfig
   translateRequest: SelectionToolbarTranslateRequestSlice
@@ -168,13 +173,14 @@ async function translateWithTextStream({
     targetLangName,
     preparedText,
     {
-      ...(webPageContext
+      ...(webPageContext || surroundingText
         ? {
             context: {
-              webTitle: webPageContext.webTitle,
-              webDescription: webPageContext.webDescription,
-              webContent: webPageContext.webContent,
-              webSummary: webPageContext.webSummary,
+              webTitle: webPageContext?.webTitle,
+              webDescription: webPageContext?.webDescription,
+              webContent: webPageContext?.webContent,
+              webSummary: webPageContext?.webSummary,
+              paragraphs: surroundingText,
             },
           }
         : {}),
@@ -203,12 +209,14 @@ async function translateWithTextStream({
 
 async function translateWithHostedTextStream({
   preparedText,
+  surroundingText,
   provider,
   translateRequest,
   onChunk,
   registerAbortController,
 }: {
   preparedText: string
+  surroundingText?: string
   provider: SystemProviderRef
   translateRequest: SelectionToolbarTranslateRequestSlice
   onChunk: (data: BackgroundTextStreamSnapshot) => void
@@ -247,13 +255,14 @@ async function translateWithHostedTextStream({
     targetLangName,
     preparedText,
     {
-      ...(webPageContext
+      ...(webPageContext || surroundingText
         ? {
             context: {
-              webTitle: webPageContext.webTitle,
-              webDescription: webPageContext.webDescription,
-              webContent: webPageContext.webContent,
-              webSummary: webPageContext.webSummary,
+              webTitle: webPageContext?.webTitle,
+              webDescription: webPageContext?.webDescription,
+              webContent: webPageContext?.webContent,
+              webSummary: webPageContext?.webSummary,
+              paragraphs: surroundingText,
             },
           }
         : {}),
@@ -384,6 +393,9 @@ export function SelectionTranslationProvider({ children }: { children: ReactNode
   const isSaveToNotebaseDialogOpen = useAtomValue(isSaveToNotebaseDialogOpenAtom)
   const {
     suggestion: noteSuggestion,
+    status: noteSuggestionStatus,
+    errorMessage: noteSuggestionError,
+    activeSessionKey: noteSuggestionActiveKey,
     maybeFire: maybeFireNoteSuggestion,
     cancel: cancelNoteSuggestion,
     resetSession: resetNoteSuggestionSession,
@@ -481,6 +493,14 @@ export function SelectionTranslationProvider({ children }: { children: ReactNode
       )
       const providerAnalytics = classifyResolvedProvider(translateRequest.provider)
 
+      // The paragraph the selection sits in, when that differs from the input
+      // itself: it is what lets the model resolve a pronoun or an elided subject
+      // that the selection alone cannot carry.
+      const surroundingText = (() => {
+        const context = paragraphsText?.trim()
+        return context && context !== preparedText.trim() ? context : undefined
+      })()
+
       setIsTranslating(true)
       setTranslatedText(undefined)
       setThinking(null)
@@ -523,6 +543,7 @@ export function SelectionTranslationProvider({ children }: { children: ReactNode
 
           const nextSnapshot = await translateWithHostedTextStream({
             preparedText,
+            surroundingText,
             provider,
             translateRequest,
             onChunk: (data) => {
@@ -560,6 +581,7 @@ export function SelectionTranslationProvider({ children }: { children: ReactNode
 
           const nextSnapshot = await translateWithTextStream({
             preparedText,
+            surroundingText,
             providerId: providerConfig.id,
             providerConfig,
             translateRequest,
@@ -616,7 +638,7 @@ export function SelectionTranslationProvider({ children }: { children: ReactNode
         }
       }
     },
-    [resetTranslationState, selectionText, sourceSurface, translateRequest],
+    [paragraphsText, resetTranslationState, selectionText, sourceSurface, translateRequest],
   )
 
   const startTranslation = useEffectEvent((runId: number) => {
@@ -857,16 +879,29 @@ export function SelectionTranslationProvider({ children }: { children: ReactNode
               isTranslating={isTranslating}
               thinking={thinking}
             />
-            {!isTranslating &&
-              !!translatedText &&
-              !error &&
-              noteSuggestion?.sessionKey === noteSuggestionSessionKey && (
+            {noteSuggestionActiveKey === noteSuggestionSessionKey &&
+              (noteSuggestionStatus === "ready" && noteSuggestion ? (
                 <NoteSuggestionCard
                   key={noteSuggestion.sessionKey}
                   suggestion={noteSuggestion}
                   markShownOnce={markNoteSuggestionShownOnce}
+                  selectionText={selectionText ?? ""}
+                  contextText={paragraphsText ?? ""}
+                  sourceTitle={titleText ?? ""}
+                  sourceUrl={location.href}
                 />
-              )}
+              ) : noteSuggestionStatus === "loading" ? (
+                <NoteSuggestionPendingCard
+                  key={`pending-${noteSuggestionSessionKey}`}
+                  mode="loading"
+                />
+              ) : noteSuggestionStatus === "error" ? (
+                <NoteSuggestionPendingCard
+                  key={`error-${noteSuggestionSessionKey}`}
+                  mode="error"
+                  message={noteSuggestionError}
+                />
+              ) : null)}
             <SelectionToolbarErrorAlert error={error} className="-mt-3" />
           </SelectionPopover.Body>
           <TranslateFooterContent

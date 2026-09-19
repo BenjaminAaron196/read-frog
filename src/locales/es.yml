@@ -1091,6 +1091,7 @@ options:
           webDescription: Descripción de la página web desde los metadatos
           webContent: Contenido de la página web (truncado a los primeros 2000 caracteres)
           webSummary: Resumen de la página web (requiere contexto inteligente de IA)
+          paragraphs: Oraciones alrededor de la selección (solo barra de selección)
         save: Guardar cambios
         close: Cancelar
       deletePrompt:

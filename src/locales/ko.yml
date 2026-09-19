@@ -975,6 +975,7 @@ options:
           webDescription: 페이지 메타데이터의 웹페이지 설명
           webContent: 웹페이지 본문(앞의 2000자로 잘림)
           webSummary: 웹페이지 요약 (AI 스마트 컨텍스트 필요)
+          paragraphs: 선택 영역 주변의 문장 (선택 도구 모음 전용)
         save: 저장
         close: 취소
       deletePrompt:

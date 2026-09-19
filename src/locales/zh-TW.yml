@@ -1091,6 +1091,7 @@ options:
           webDescription: 頁面中繼資料的網頁描述
           webContent: 網頁內文（截斷到前 2000 個字元）
           webSummary: 網頁摘要（需啟用 AI 智慧上下文）
+          paragraphs: 選區所在的上下文段落（僅劃詞工具列）
         save: 儲存
         close: 取消
       deletePrompt:
@@ -1390,6 +1391,56 @@ speak:
   noTextSelected: 未選取文字
   openaiNotConfigured: 尚未設定或啟用 OpenAI 提供者
   openaiApiKeyNotConfigured: 尚未設定 OpenAI API 金鑰
+wordBook:
+  save: 儲存到生詞本
+  saving: 儲存中...
+  saved: 已儲存到生詞本
+  savedCount: 已儲存 $1 條到生詞本
+  alreadySaved: 生詞本中已有該詞
+  saveFailed: 儲存失敗
+  syncedToNotion: 已同步到 Notion
+  notionNotConnected: 已儲存到本機 - 連接 Notion 後可同步
+  syncFailed: 已儲存到本機 - Notion 同步失敗
+  panel:
+    description: "儲存閱讀時查過的生詞，並可選擇同步到 Notion。"
+    enable: 查詞時顯示儲存按鈕
+    title: 生詞本
+    empty: 閱讀時儲存的生詞會顯示在這裡。
+    words: 生詞
+    notion: Notion
+    syncStateSynced: 已同步
+    syncStatePending: 待同步
+    syncStateFailed: 同步失敗
+    retry: 重試
+    retryAll: 全部重試
+    remove: 刪除
+    openInNotion: 在 Notion 中開啟
+  notion:
+    title: Notion 連接
+    description: 在 notion.so/my-integrations 建立內部整合，將目標資料庫分享給它，然後貼上 Token。
+    token: 整合 Token
+    tokenPlaceholder: ntn_...
+    test: 測試連接
+    testing: 測試中...
+    testOk: 已連接為 $1
+    testFailed: 連接失敗：$1
+    database: 資料庫
+    loadDatabases: 載入資料庫
+    loadingDatabases: 載入中...
+    noDatabases: 此整合尚未被分享任何資料庫。
+    mapping: 欄位對應
+    mappingIncomplete: 請選擇一個類型為「標題」的 Notion 屬性，否則無法建立項目。
+    property: Notion 屬性
+    ignore: 不寫入
+    save: 儲存設定
+    saved: Notion 設定已儲存
+  field:
+    word: 生詞
+    definition: 釋義
+    context: 例句
+    sourceUrl: 來源連結
+    sourceTitle: 來源標題
+    addedAt: 新增時間
 action:
   copy: 複製
   copied: 已複製
@@ -1436,6 +1487,10 @@ noteSuggestion:
   description: 選擇要存入筆記庫的詞，將來隨時複習
   save: 儲存
   saved: 已儲存
+  saveToNotion: 存入 Notion
+  savedToNotion: 已存入 Notion
+  loading: 正在分析這段文字…
+  failed: 猜你想存載入失敗
   staleSuggestion: 該建議已過期
   toggleLabel: 顯示猜你想存
 thinking:

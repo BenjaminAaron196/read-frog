@@ -12,6 +12,8 @@ export const WEB_PAGE_PROMPT_TOKENS = [
   "webDescription",
   "webContent",
   "webSummary",
+  // Appended, never inserted: the constants below index this array by position.
+  "paragraphs",
 ] as const
 export const SUBTITLE_PROMPT_TOKENS = [
   "targetLanguage",
@@ -48,6 +50,8 @@ export const WEB_TITLE = WEB_PAGE_PROMPT_TOKENS[2]
 export const WEB_DESCRIPTION = WEB_PAGE_PROMPT_TOKENS[3]
 export const WEB_CONTENT = WEB_PAGE_PROMPT_TOKENS[4]
 export const WEB_SUMMARY = WEB_PAGE_PROMPT_TOKENS[5]
+/** The sentences around the selection; the page pipeline has no equivalent. */
+export const WEB_PARAGRAPHS = WEB_PAGE_PROMPT_TOKENS[6]
 export const SUBTITLE_TARGET_LANGUAGE = SUBTITLE_PROMPT_TOKENS[0]
 export const SUBTITLE_INPUT = SUBTITLE_PROMPT_TOKENS[1]
 export const SUBTITLE_WEB_TITLE = SUBTITLE_PROMPT_TOKENS[2]
@@ -63,10 +67,19 @@ export const DEFAULT_TRANSLATE_SYSTEM_PROMPT = `You are a professional ${getToke
 2. The returned translation must maintain exactly the same number of paragraphs and format as the original text.
 3. If the text contains HTML tags, consider where the tags should be placed in the translation while maintaining fluency.
 4. For content that should not be translated (such as proper nouns, code, etc.), keep the original text.
+5. Translate idioms, phrasal verbs, and collocations as idiomatic expressions in ${getTokenCellText(TARGET_LANGUAGE)}, never word for word.
+
+## Context Rules
+1. Read the surrounding text and the document metadata first: they tell you who or what the input refers to.
+2. Resolve pronouns, ellipsis, and omitted subjects from that context. A pronoun whose referent appears only in the surrounding text is translated as that referent, not carried over as a bare pronoun: with the surrounding text "Fame in the art world is ephemeral", the input "It is ephemeral" becomes a sentence about fame, never "它是短暂的".
+3. When a word has several meanings, translate the sense this passage uses, not its most common sense.
+4. Keep terminology consistent with the surrounding text, including names and technical terms.
+5. Use the context silently: translate only the input, never the surrounding text, and never mention or quote the context in the output.
 
 ## Document Metadata for Context Awareness
 Webpage title: ${getTokenCellText(WEB_TITLE)}
-Webpage summary: ${getTokenCellText(WEB_SUMMARY)}`
+Webpage summary: ${getTokenCellText(WEB_SUMMARY)}
+Surrounding text: ${getTokenCellText(WEB_PARAGRAPHS)}`
 
 export const DEFAULT_SUBTITLE_TRANSLATE_SYSTEM_PROMPT = `You are a professional ${getTokenCellText(SUBTITLE_TARGET_LANGUAGE)} native translator who needs to fluently translate subtitles into ${getTokenCellText(SUBTITLE_TARGET_LANGUAGE)}.
 
@@ -102,7 +115,7 @@ You are a ${getTokenCellText(TARGET_LANGUAGE)} native expert who masters the phi
 ## Output Rules
 1. **Output Translation Only**: Provide only the final translated result. Do not include introductory text, explanations, notes, or labels such as "Here is the translation."
 2. **Strict Format Correspondence**: Match the original paragraph count, list structure, placeholders, and other formatting exactly.
-3. **Use Context Silently**: Use the document metadata below only to improve contextual and terminological accuracy. Never mention it in the output.
+3. **Use Context Silently**: Use the document metadata and the surrounding text below only to resolve references, pick the sense the passage uses, and keep terminology consistent. Never mention or quote them in the output.
 
 ## Silent Internal Workflow
 Perform these steps internally without revealing them:
@@ -114,7 +127,8 @@ Never output analysis, reasoning, drafts, diagnoses, issue lists, or commentary.
 
 ## Document Metadata for Context Awareness
 Webpage title: ${getTokenCellText(WEB_TITLE)}
-Webpage summary: ${getTokenCellText(WEB_SUMMARY)}`
+Webpage summary: ${getTokenCellText(WEB_SUMMARY)}
+Surrounding text: ${getTokenCellText(WEB_PARAGRAPHS)}`
 
 export const PRECISION_REWRITE_TRANSLATE_PROMPT = `Translate to ${getTokenCellText(TARGET_LANGUAGE)}:
 

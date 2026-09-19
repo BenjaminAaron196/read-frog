@@ -1091,6 +1091,7 @@ options:
           webDescription: Səhifənin metaməlumatlarından götürülmüş təsviri
           webContent: Veb səhifənin məzmunu (ilk 2000 simvolla məhdudlaşdırılır)
           webSummary: Veb səhifənin xülasəsi (süni intellektlə ağıllı kontekst tələb olunur)
+          paragraphs: Seçimin ətrafındakı cümlələr (yalnız seçim paneli)
         save: Dəyişiklikləri yadda saxla
         close: Ləğv et
       deletePrompt:

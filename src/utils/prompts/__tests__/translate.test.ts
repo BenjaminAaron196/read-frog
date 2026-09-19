@@ -66,6 +66,50 @@ describe("translate prompt tokens", () => {
     )
   })
 
+  it("fills the surrounding-text token only when the caller has it", () => {
+    const config: Pick<Config["pageTranslation"], "customPromptsConfig"> = {
+      customPromptsConfig: {
+        promptId: "context-prompt",
+        patterns: [
+          {
+            id: "context-prompt",
+            name: "Context",
+            systemPrompt: "Around: {{paragraphs}}",
+            prompt: "Translate {{input}}",
+          },
+        ],
+      },
+    }
+
+    const withParagraphs = getTranslatePromptFromConfig(config, "English", "it is ephemeral", {
+      context: { paragraphs: "Fame in the art world is ephemeral." },
+    })
+    expect(withParagraphs.systemPrompt).toBe("Around: Fame in the art world is ephemeral.")
+
+    const withoutParagraphs = getTranslatePromptFromConfig(config, "English", "it is ephemeral")
+    expect(withoutParagraphs.systemPrompt).toBe("Around: No surrounding text available")
+  })
+
+  it("tells the default prompt how to use the context it is given", () => {
+    const result = getTranslatePromptFromConfig(
+      defaultTranslatePromptConfig,
+      "English",
+      "it is ephemeral",
+      { context: { webTitle: "Fame", paragraphs: "Fame in the art world is ephemeral." } },
+    )
+
+    expect(result.systemPrompt).toContain("## Context Rules")
+    expect(result.systemPrompt).toContain("Resolve pronouns, ellipsis, and omitted subjects")
+    expect(result.systemPrompt).toContain("never mention or quote the context in the output")
+    expect(result.systemPrompt).toContain("Surrounding text: Fame in the art world is ephemeral.")
+    expect(result.systemPrompt).toContain(
+      "Translate idioms, phrasal verbs, and collocations as idiomatic expressions",
+    )
+    expect(result.systemPrompt).toContain(
+      'the input "It is ephemeral" becomes a sentence about fame, never',
+    )
+  })
+
   it("does not replace legacy translate prompt tokens at runtime", () => {
     const config: Pick<Config["pageTranslation"], "customPromptsConfig"> = {
       customPromptsConfig: {

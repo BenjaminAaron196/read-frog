@@ -975,6 +975,7 @@ options:
           webDescription: ページメタデータのウェブページ説明
           webContent: ウェブページ本文（先頭 2000 文字に切り詰め）
           webSummary: ウェブページ要約（AI スマートコンテキストが必要）
+          paragraphs: 選択範囲の前後の文（選択ツールバーのみ）
         save: 保存
         close: キャンセル
       deletePrompt:

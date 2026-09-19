@@ -51,6 +51,9 @@ const GlossaryEditorPage = lazy(() =>
 function AdvancedRedirect() {
   return <Navigate to="/advanced/glossary" replace />
 }
+const WordBookPage = lazy(() =>
+  import("./pages/word-book").then((module) => ({ default: module.WordBookPage })),
+)
 const HelpAndCommunityPage = lazy(() =>
   import("./pages/help-and-community").then((module) => ({ default: module.HelpAndCommunityPage })),
 )
@@ -135,6 +138,7 @@ const ROUTE_COMPONENTS: Record<RoutePath, ComponentType> = {
   "/tts": TextToSpeechPage,
   "/advanced": AdvancedRedirect,
   "/help-and-community": HelpAndCommunityPage,
+  "/word-book": WordBookPage,
   "/advanced/glossary": GlossaryPage,
   "/advanced/glossary/:glossaryId": GlossaryEditorPage,
   "/preference/config-backup": ConfigBackupPage,

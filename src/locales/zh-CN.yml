@@ -1091,6 +1091,7 @@ options:
           webDescription: 页面元信息中的网页描述
           webContent: 网页正文内容（截断到前 2000 个字符）
           webSummary: 网页摘要（需启用 AI 智能上下文）
+          paragraphs: 选区所在的上下文段落（仅划词工具栏）
         save: 保存
         close: 取消
       deletePrompt:
@@ -1390,6 +1391,56 @@ speak:
   noTextSelected: 未选择文本
   openaiNotConfigured: OpenAI 提供商未配置或未启用
   openaiApiKeyNotConfigured: OpenAI API Key 未配置
+wordBook:
+  save: 保存到生词本
+  saving: 保存中...
+  saved: 已保存到生词本
+  savedCount: 已保存 $1 条到生词本
+  alreadySaved: 生词本中已有该词
+  saveFailed: 保存失败
+  syncedToNotion: 已同步到 Notion
+  notionNotConnected: 已保存到本地 - 连接 Notion 后可同步
+  syncFailed: 已保存到本地 - Notion 同步失败
+  panel:
+    description: "保存阅读时查过的生词，并可选择同步到 Notion。"
+    enable: 查词时显示保存按钮
+    title: 生词本
+    empty: 阅读时保存的生词会显示在这里。
+    words: 生词
+    notion: Notion
+    syncStateSynced: 已同步
+    syncStatePending: 待同步
+    syncStateFailed: 同步失败
+    retry: 重试
+    retryAll: 全部重试
+    remove: 删除
+    openInNotion: 在 Notion 中打开
+  notion:
+    title: Notion 连接
+    description: 在 notion.so/my-integrations 创建内部集成，把目标数据库分享给它，然后粘贴 Token。
+    token: 集成 Token
+    tokenPlaceholder: ntn_...
+    test: 测试连接
+    testing: 测试中...
+    testOk: 已连接为 $1
+    testFailed: 连接失败：$1
+    database: 数据库
+    loadDatabases: 加载数据库
+    loadingDatabases: 加载中...
+    noDatabases: 该集成还没有被分享任何数据库。
+    mapping: 字段映射
+    mappingIncomplete: 请选择一个类型为「标题」的 Notion 属性，否则无法创建条目。
+    property: Notion 属性
+    ignore: 不写入
+    save: 保存设置
+    saved: Notion 设置已保存
+  field:
+    word: 生词
+    definition: 释义
+    context: 例句
+    sourceUrl: 来源链接
+    sourceTitle: 来源标题
+    addedAt: 添加时间
 action:
   copy: 复制
   copied: 已复制
@@ -1436,6 +1487,10 @@ noteSuggestion:
   description: 选择要存入笔记库的词，将来随时复习
   save: 保存
   saved: 已保存
+  saveToNotion: 存入 Notion
+  savedToNotion: 已存入 Notion
+  loading: 正在分析这段文字…
+  failed: 猜你想存加载失败
   staleSuggestion: 该建议已过期
   toggleLabel: 显示猜你想存
 thinking:

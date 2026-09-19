@@ -4,6 +4,8 @@ import { cn } from "@/utils/styles/utils"
 export interface ConfigSectionProps {
   id?: string
   title: ReactNode
+  /** Set when the surrounding surface already names the section (a tab, a panel). */
+  hideTitle?: boolean
   children: ReactNode
   className?: string
   contentClassName?: string
@@ -13,6 +15,7 @@ export interface ConfigSectionProps {
 export function ConfigSection({
   id,
   title,
+  hideTitle,
   children,
   className,
   contentClassName,
@@ -21,7 +24,11 @@ export function ConfigSection({
   return (
     <section id={id} className={cn("w-full", className)}>
       <h2
-        className={cn("mb-4 border-b pb-3 text-base font-medium text-foreground", titleClassName)}
+        className={cn(
+          "mb-4 border-b pb-3 text-base font-medium text-foreground",
+          hideTitle && "hidden",
+          titleClassName,
+        )}
       >
         {title}
       </h2>

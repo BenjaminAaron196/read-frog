@@ -34,6 +34,7 @@ import { CustomActionToolButton } from "./custom-action-tool-button"
 import { SaveToNotebaseButton } from "./save-to-notebase-button"
 import { isSaveToNotebaseDialogOpenAtom } from "./save-to-notebase-dialog-atom"
 import { SaveToNotebaseDialogHost } from "./save-to-notebase-dialog-host"
+import { SaveToWordBookButton } from "./save-to-word-book-button"
 import {
   buildCustomActionExecutionPlan,
   useCustomActionExecution,
@@ -433,6 +434,15 @@ export function SelectionCustomActionProvider({ children }: { children: ReactNod
                   action={activeAction}
                   isRunning={displayedIsRunning}
                   result={displayedResult}
+                />
+                <SaveToWordBookButton
+                  action={activeAction}
+                  contextText={paragraphsText}
+                  isRunning={displayedIsRunning}
+                  result={displayedResult}
+                  selectionText={cleanSelection ?? ""}
+                  sourceTitle={titleText ?? ""}
+                  sourceUrl={webPageContext?.url ?? location.href}
                 />
                 <CustomActionToolButton action={activeAction} />
               </>

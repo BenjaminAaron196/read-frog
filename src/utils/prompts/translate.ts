@@ -24,6 +24,7 @@ import {
   TARGET_LANGUAGE,
   WEB_CONTENT,
   WEB_DESCRIPTION,
+  WEB_PARAGRAPHS,
   WEB_SUMMARY,
   WEB_TITLE,
 } from "../constants/prompt"
@@ -125,6 +126,10 @@ ${INLINE_ATOM_TOKEN_SYSTEM_PROMPT}`
     options?.context?.webSummary,
     "No summary available",
   )
+  const paragraphs = resolvePromptReplacementValue(
+    options?.context?.paragraphs,
+    "No surrounding text available",
+  )
 
   // Replace tokens in both prompts
   const replaceTokens = (text: string) =>
@@ -135,6 +140,7 @@ ${INLINE_ATOM_TOKEN_SYSTEM_PROMPT}`
       .replaceAll(getTokenCellText(WEB_DESCRIPTION), description)
       .replaceAll(getTokenCellText(WEB_CONTENT), contentText)
       .replaceAll(getTokenCellText(WEB_SUMMARY), summary)
+      .replaceAll(getTokenCellText(WEB_PARAGRAPHS), paragraphs)
 
   // The glossary block is appended AFTER token replacement, and that ordering is
   // load-bearing: a term is arbitrary user text that may contain a `{{input}}`-

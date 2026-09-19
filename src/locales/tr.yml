@@ -975,6 +975,7 @@ options:
           webDescription: Sayfa meta verilerinden web sayfası açıklaması
           webContent: Web sayfası içeriği (ilk 2000 karaktere kısaltılır)
           webSummary: Web sayfası özeti (AI akıllı bağlam gerektirir)
+          paragraphs: Seçimin çevresindeki cümleler (yalnızca seçim araç çubuğu)
         save: Değişiklikleri kaydet
         close: İptal
       deletePrompt:

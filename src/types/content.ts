@@ -10,6 +10,8 @@ export interface WebPagePromptContext {
   webDescription?: string | null
   webContent?: string | null
   webSummary?: string | null
+  /** Sentences around the selection; only the selection toolbar has them. */
+  paragraphs?: string | null
 }
 
 export interface SubtitlePromptContext {

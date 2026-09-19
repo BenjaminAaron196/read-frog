@@ -40,6 +40,7 @@ import { translationMessage } from "./translation-signal"
 import { setupTTSPlaybackMessageHandlers } from "./tts-playback"
 import { setupUninstallSurvey } from "./uninstall-survey"
 import { setupVideoSummaryHandlers } from "./video-summary"
+import { setupWordBookMessageHandlers, setupWordBookPendingSync } from "./word-book"
 
 export default defineBackground({
   type: "module",
@@ -151,11 +152,13 @@ export default defineBackground({
     proxyFetch()
     setupHostedAiStatusHandler()
     setupGlossaryMessageHandlers()
+    setupWordBookMessageHandlers()
     setupNotebasePendingSaveProcessor(() => backgroundReady)
     setupEdgeTTSMessageHandlers()
     setupLLMGenerateTextMessageHandlers()
     setupTTSPlaybackMessageHandlers()
     void initMockData()
+    setupWordBookPendingSync()
 
     // Setup on-demand iframe injection after page translation is enabled.
     setupIframeInjection()

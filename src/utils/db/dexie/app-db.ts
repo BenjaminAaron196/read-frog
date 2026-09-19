@@ -9,6 +9,7 @@ import Glossary from "./tables/glossary"
 import GlossarySyncSnapshot from "./tables/glossary-sync-snapshot"
 import GlossaryTerm from "./tables/glossary-term"
 import TranslationCache from "./tables/translation-cache"
+import WordBookEntry from "./tables/word-book"
 
 export default class AppDB extends Dexie {
   translationCache!: EntityTable<TranslationCache, "key">
@@ -24,6 +25,8 @@ export default class AppDB extends Dexie {
   glossaryTerm!: EntityTable<GlossaryTerm, "id">
 
   glossarySyncSnapshot!: EntityTable<GlossarySyncSnapshot, "id">
+
+  wordBook!: EntityTable<WordBookEntry, "id">
 
   constructor() {
     super(`${upperCamelCase(APP_NAME)}DB`)
@@ -154,6 +157,48 @@ export default class AppDB extends Dexie {
       glossarySyncSnapshot: `
         id`,
     })
+    // v7 adds the word book: the words the reader saved, plus the Notion sync
+    // state of each one. Like the glossary this is user data, so it gets no
+    // cleanup job. Dexie creates the store; every version must still restate
+    // the full store set, so the seven above are repeated verbatim.
+    this.version(7).stores({
+      translationCache: `
+        key,
+        translation,
+        createdAt`,
+      batchRequestRecord: `
+        key,
+        createdAt,
+        originalRequestCount,
+        provider,
+        model`,
+      articleSummaryCache: `
+        key,
+        createdAt`,
+      aiSegmentationCache: `
+        key,
+        createdAt`,
+      glossary: `
+        id,
+        enabled,
+        createdAt`,
+      glossaryTerm: `
+        id,
+        glossaryId,
+        &[glossaryId+targetLang+matchKey],
+        enabled,
+        updatedAt`,
+      // Two rows, under two fixed ids, each holding a whole glossary. Nothing
+      // queries them by anything but the id.
+      glossarySyncSnapshot: `
+        id`,
+      // `syncStatus` indexes the rows still owing a Notion write; `addedAt`
+      // orders the list the side panel renders, newest first.
+      wordBook: `
+        id,
+        syncStatus,
+        addedAt`,
+    })
     this.translationCache.mapToClass(TranslationCache)
     this.batchRequestRecord.mapToClass(BatchRequestRecord)
     this.articleSummaryCache.mapToClass(ArticleSummaryCache)
@@ -161,5 +206,6 @@ export default class AppDB extends Dexie {
     this.glossary.mapToClass(Glossary)
     this.glossaryTerm.mapToClass(GlossaryTerm)
     this.glossarySyncSnapshot.mapToClass(GlossarySyncSnapshot)
+    this.wordBook.mapToClass(WordBookEntry)
   }
 }

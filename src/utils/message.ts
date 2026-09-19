@@ -22,8 +22,14 @@ import type {
 import type { GlossarySnapshot } from "@/utils/glossary/active-matcher"
 import type { MatchedTerm } from "@/utils/glossary/types"
 import type { HostedAiStatus } from "@/utils/hosted-ai/types"
+import type {
+  NotionDatabaseListResult,
+  NotionDatabaseResult,
+  NotionUserResult,
+} from "@/utils/notion/result"
 import type { PromptableProviderRef, SerializableProviderRef } from "@/utils/providers/provider-ref"
 import type { EdgeTTSVoice } from "@/utils/server/edge-tts/types"
+import type { WordBookAddResult, WordBookDraft, WordBookRecord } from "@/utils/word-book/sync"
 import { defineExtensionMessaging } from "@webext-core/messaging"
 
 interface ProtocolMap {
@@ -89,6 +95,17 @@ interface ProtocolMap {
     selectionText: string
   }) => void
   readAloudSelectionFromContextMenu: (data: { selectionText: string }) => void
+  // word book — the saved words live in the extension's IndexedDB and the
+  // Notion token must never reach a page context, so every read and write goes
+  // through the background.
+  wordBookAdd: (data: WordBookDraft) => Promise<WordBookAddResult>
+  wordBookList: () => Promise<WordBookRecord[]>
+  wordBookRemove: (data: { id: string }) => Promise<void>
+  wordBookRetry: (data: { id: string }) => Promise<WordBookRecord | null>
+  wordBookSyncPending: () => Promise<WordBookRecord[]>
+  notionTestConnection: (data: { apiKey: string }) => Promise<NotionUserResult>
+  notionListDatabases: (data: { apiKey: string }) => Promise<NotionDatabaseListResult>
+  notionGetDatabase: (data: { apiKey: string; databaseId: string }) => Promise<NotionDatabaseResult>
   // analytics
   trackFeatureUsedEvent: (data: FeatureUsedEventProperties) => void
   // user guide

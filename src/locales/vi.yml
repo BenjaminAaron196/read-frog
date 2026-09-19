@@ -975,6 +975,7 @@ options:
           webDescription: Mô tả trang web từ siêu dữ liệu trang
           webContent: Nội dung trang web (bị cắt còn 2000 ký tự đầu)
           webSummary: Tóm tắt trang web (yêu cầu ngữ cảnh thông minh AI)
+          paragraphs: Các câu xung quanh phần đã chọn (chỉ thanh công cụ chọn)
         save: Lưu thay đổi
         close: Hủy
       deletePrompt:

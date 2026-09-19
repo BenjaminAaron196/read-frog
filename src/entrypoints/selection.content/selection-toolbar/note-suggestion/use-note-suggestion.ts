@@ -10,6 +10,7 @@ import { streamBackgroundNoteSuggestion } from "@/utils/content-script/backgroun
 import { STREAM_PORT_DISCONNECTED_MESSAGE } from "@/utils/content-script/port-streaming"
 import { getRandomUUID } from "@/utils/crypto-polyfill"
 import { resolveNoteSuggestionAction } from "@/utils/custom-actions"
+import { extractAISDKErrorMessage } from "@/utils/error/extract-message"
 import { getOrCreateWebPageContext } from "@/utils/host/translate/webpage-context"
 import { getHostedAiTierStatus } from "@/utils/hosted-ai/status"
 import { logger } from "@/utils/logger"
@@ -21,6 +22,13 @@ import { fetchHostedAiStatus } from "@/utils/providers/provider-ref"
 import { getTopLevelReasoning } from "@/utils/providers/reasoning"
 import { isAbortError } from "../inline-error"
 import { buildNoteSuggestionPrompts } from "./prompt"
+
+/**
+ * What the card renders. A request that is in flight or that failed has no
+ * suggestion to show, but the user still has to see that the feature ran -
+ * silence is indistinguishable from "nothing worth saving".
+ */
+export type NoteSuggestionStatus = "idle" | "loading" | "ready" | "error"
 
 export interface NoteSuggestionSessionResult {
   /** Composite key: popoverSessionKey:translateRequestKey:rerunNonce. */
@@ -65,6 +73,11 @@ export interface NoteSuggestionFireInput {
 export function useNoteSuggestion() {
   const selectionToolbar = useAtomValue(configFieldsAtomMap.selectionToolbar)
   const [suggestion, setSuggestion] = useState<NoteSuggestionSessionResult | null>(null)
+  const [status, setStatus] = useState<NoteSuggestionStatus>("idle")
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  // The key of the run the status belongs to, so the popover can tell a pending
+  // card for this session from a leftover one.
+  const [activeSessionKey, setActiveSessionKey] = useState<string | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
   // Sets rather than single slots so an A→B→A key round-trip inside one
   // popover (e.g. peeking at another target language) neither re-fires a
@@ -86,6 +99,9 @@ export function useNoteSuggestion() {
     completedSessionKeysRef.current.clear()
     shownSessionKeysRef.current.clear()
     setSuggestion(null)
+    setStatus("idle")
+    setErrorMessage(null)
+    setActiveSessionKey(null)
   }, [cancel])
 
   /** Returns true only the first time it is called for a session. */
@@ -116,6 +132,9 @@ export function useNoteSuggestion() {
 
     const abortController = new AbortController()
     abortControllerRef.current = abortController
+    setStatus("loading")
+    setErrorMessage(null)
+    setActiveSessionKey(input.sessionKey)
     const { signal } = abortController
     const firedAt = Date.now()
     const provider = input.provider
@@ -136,11 +155,11 @@ export function useNoteSuggestion() {
         // does; going through it also shares the request with whatever else
         // resolves a hosted ref at the same moment, since one status response
         // covers every feature.
-        const status = await fetchHostedAiStatus()
+        const hostedStatus = await fetchHostedAiStatus()
         if (signal.aborted) {
           return
         }
-        const tierStatus = getHostedAiTierStatus(status, "noteSuggestion", provider.modelTier)
+        const tierStatus = getHostedAiTierStatus(hostedStatus, "noteSuggestion", provider.modelTier)
         if (tierStatus && !tierStatus.available) {
           logger.info(
             "[NoteSuggestion] Skipped: hosted tier unavailable",
@@ -204,6 +223,8 @@ export function useNoteSuggestion() {
       // The prompt sanctions an empty notes array ("truly nothing worth
       // saving"): the provider worked correctly, it just renders no card.
       if (envelope.success && envelope.data.notes.length === 0) {
+        setStatus("idle")
+        setActiveSessionKey(null)
         return
       }
 
@@ -216,6 +237,8 @@ export function useNoteSuggestion() {
 
       if (!validated) {
         logger.info("[NoteSuggestion] Discarded schema/semantically invalid suggestion output")
+        setStatus("idle")
+        setActiveSessionKey(null)
         return
       }
 
@@ -226,6 +249,7 @@ export function useNoteSuggestion() {
         firedAt,
         analyticsProvider: classifyResolvedProvider(provider),
       })
+      setStatus("ready")
     }
 
     void run()
@@ -245,6 +269,8 @@ export function useNoteSuggestion() {
 
         completedSessionKeysRef.current.add(input.sessionKey)
         logger.info("[NoteSuggestion] Suggestion request failed", error)
+        setStatus("error")
+        setErrorMessage(extractAISDKErrorMessage(error))
       })
       .finally(() => {
         if (abortControllerRef.current === abortController) {
@@ -255,6 +281,9 @@ export function useNoteSuggestion() {
 
   return {
     suggestion,
+    status,
+    errorMessage,
+    activeSessionKey,
     maybeFire,
     cancel,
     resetSession,

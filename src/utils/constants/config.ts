@@ -44,6 +44,7 @@ import {
 import { DEFAULT_TRANSLATION_HUB_SHORTCUT_KEY } from "./translation-hub"
 import { TRANSLATION_NODE_STYLE_ON_INSTALLED } from "./translation-node-style"
 import { DEFAULT_TTS_CONFIG } from "./tts"
+import { DEFAULT_WORD_BOOK_CONFIG } from "./word-book"
 
 export const CONFIG_STORAGE_KEY = "config"
 export const LAST_SYNCED_CONFIG_STORAGE_KEY = "lastSyncedConfig"
@@ -51,7 +52,7 @@ export const GOOGLE_DRIVE_TOKEN_STORAGE_KEY = "__googleDriveToken"
 
 export const THEME_STORAGE_KEY = "theme"
 export const DEFAULT_DETECTED_CODE = "eng" as const
-export const CONFIG_SCHEMA_VERSION = 101
+export const CONFIG_SCHEMA_VERSION = 102
 
 export const DEFAULT_FLOATING_BUTTON_POSITION = 0.66
 export const DEFAULT_FLOATING_BUTTON_SIDE: FloatingButtonSide = "right"
@@ -235,6 +236,7 @@ export const DEFAULT_CONFIG: Config = {
     shortcut: DEFAULT_TRANSLATION_HUB_SHORTCUT_KEY,
   },
   glossary: { ...DEFAULT_GLOSSARY_CONFIG },
+  wordBook: { ...DEFAULT_WORD_BOOK_CONFIG },
 }
 
 /**
