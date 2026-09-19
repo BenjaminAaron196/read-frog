@@ -1,3 +1,5 @@
 export * from "./types"
 export { AiSubtitlesFetcher } from "./ai"
+export { BloombergSubtitlesFetcher } from "./bloomberg"
+export { ReutersSubtitlesFetcher } from "./reuters"
 export { YoutubeSubtitlesFetcher } from "./youtube"

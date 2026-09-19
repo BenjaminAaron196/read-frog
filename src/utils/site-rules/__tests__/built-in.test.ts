@@ -401,6 +401,51 @@ describe("built-in site rules", () => {
     )
   })
 
+  it.each([
+    ["bloomberg", ".vjs-text-track-display"],
+    ["reuters", ".jw-captions"],
+  ])("keeps the %s rule in sync with the subtitle class constants", (ruleId, nativeCaptions) => {
+    const rule = BUILT_IN_SITE_RULES.find((candidate) => candidate.id === ruleId)
+    expect(rule).toBeDefined()
+    expect(rule!.excludeSelectors).toEqual(
+      expect.arrayContaining([
+        nativeCaptions,
+        `.${SUBTITLES_VIEW_CLASS}`,
+        `.${STATE_MESSAGE_CLASS}`,
+        `.${TRANSLATE_BUTTON_CLASS}`,
+      ]),
+    )
+  })
+
+  it.each([
+    ["bloomberg", ".video-js"],
+    ["reuters", ".jwplayer"],
+    ["readfrog-youtube", ".html5-video-player"],
+  ])("keeps the %s player chrome out of page translation", (ruleId, playerSelector) => {
+    const rule = BUILT_IN_SITE_RULES.find((candidate) => candidate.id === ruleId)
+    expect(rule).toBeDefined()
+    // Player chrome carries its own short UI strings (1x / 1.25x / time), which
+    // page translation would wrap and squeeze inside the control bar.
+    expect(rule!.excludeSelectors).toContain(playerSelector)
+  })
+
+  it("translates the Bloomberg video playlist without dropping the player exclusions", () => {
+    const entries = (url: string) =>
+      (resolveSiteRule(url, BUILT_IN_SITE_RULES, [], []).excludeSelector ?? "")
+        .split(",")
+        .map((entry) => entry.trim())
+
+    const videoPage = entries(
+      "https://www.bloomberg.com/news/videos/2026-09-16/why-the-world-is-watching-the-yen-video",
+    )
+    // The playlist lives in an <aside>, which the site-wide rule excludes.
+    expect(videoPage).not.toContain("aside")
+    expect(videoPage).toContain(".video-js")
+
+    const articlePage = entries("https://www.bloomberg.com/news/articles/2026-09-18/some-story")
+    expect(articlePage).toContain("aside")
+  })
+
   it("unclamps YouTube watch titles with or without an h1 wrapper", () => {
     const resolved = resolveSiteRule(
       "https://www.youtube.com/watch?v=video-id",

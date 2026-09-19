@@ -19,8 +19,8 @@ export function useControlsInfo(
 
     const maxHeight = container.getBoundingClientRect().height * MAX_CONTROLS_HEIGHT_RATIO
     setInfo({
-      controlsVisible: controlsConfig.checkVisibility(container),
-      controlsHeight: Math.min(controlsConfig.measureHeight(container), maxHeight),
+      controlsVisible: controlsConfig.checkVisibility?.(container) ?? false,
+      controlsHeight: Math.min(controlsConfig.measureHeight?.(container) ?? 0, maxHeight),
     })
   })
 

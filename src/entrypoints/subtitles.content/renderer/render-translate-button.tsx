@@ -13,6 +13,12 @@ const wrapperCSS = `
     justify-content: center;
     vertical-align: middle;
     height: 100%;
+    /* Player bars whose height is content-derived (Video.js) leave the
+       percentage above unresolved and collapse the button below its own icon;
+       bars that do have a height (JW Player: 32px) must still cap it, or the
+       button hangs out of the bar. */
+    min-height: 2.25rem;
+    max-height: 100%;
     margin: 0;
     padding: 0;
   }
@@ -31,6 +37,7 @@ const embedWrapperCSS = `
     align-items: center;
     position: relative;
     height: 100%;
+    min-height: 2.5rem;
   }
   .${SUBTITLES_THEME} {
     display: flex;

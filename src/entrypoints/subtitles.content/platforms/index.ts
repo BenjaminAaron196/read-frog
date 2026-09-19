@@ -2,8 +2,15 @@ import type { AiSubtitlesContext } from "@/utils/subtitles/ai/request-ai-subtitl
 
 export interface ControlsConfig {
   findVideoContainer?: () => HTMLElement | null
-  measureHeight: (container: HTMLElement) => number
-  checkVisibility: (container: HTMLElement) => boolean
+  measureHeight?: (container: HTMLElement) => number
+  checkVisibility?: (container: HTMLElement) => boolean
+
+  /**
+   * Where the translate button mounts inside the control bar. Sites whose bar
+   * already starts with the play control ask for "end" so the button joins the
+   * player controls instead of pushing them aside.
+   */
+  insertPosition?: "start" | "end"
 }
 
 export interface PlatformConfig {

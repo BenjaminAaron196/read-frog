@@ -148,7 +148,7 @@ Teknik terimler alanına göre doğru çevrilir, edebi ifadeler nüansını koru
 
 ### 🎬 [Altyazı çevirisi][docs-tutorial]
 
-YouTube altyazılarını doğrudan video oynatıcıda çevirin. Yabancı dilde içerik izlerken çeviri orijinal altyazıyla birlikte gösterilir.
+YouTube, Bloomberg ve Reuters altyazılarını doğrudan video oynatıcıda çevirin. Yabancı dilde içerik izlerken çeviri orijinal altyazıyla birlikte gösterilir.
 
 ### 🔊 [Metinden sese (TTS)][docs-tutorial]
 

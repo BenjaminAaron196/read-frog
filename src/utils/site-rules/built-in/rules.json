@@ -510,7 +510,12 @@
       "[data-testid=HomeTickerV2]",
       "[data-testid=SiteFooter]",
       "[class^=refinitiv-promo-bar__container]",
-      "[data-testid=ResponsiveAdSlot]"
+      "[data-testid=ResponsiveAdSlot]",
+      ".jwplayer",
+      ".jw-captions",
+      ".read-frog-subtitles-view",
+      ".read-frog-subtitles-state-message",
+      ".read-frog-subtitles-translate-button"
     ]
   },
   {
@@ -1572,13 +1577,27 @@
     "excludeMatches": ["https://www.bloomberg.com/live/*"],
     "excludeSelectors": [
       ".ticker-bar",
-      "nav",
       "[aria-label=Banner]",
       "aside",
       "[data-component=ticker-bar]",
       "footer.bb-global-footer",
-      ".vjs-text-track-display"
+      ".video-js",
+      "[class*=\"AutoplayOverlay\"]",
+      ".vjs-text-track-display",
+      ".read-frog-subtitles-view",
+      ".read-frog-subtitles-state-message",
+      ".read-frog-subtitles-translate-button"
     ]
+  },
+  {
+    "id": "bloombergVideos",
+    "description": "Translate the video playlist column, which the site-wide rule skips as an aside",
+    "matches": [
+      "https://www.bloomberg.com/news/videos/*",
+      "https://www.bloomberg.com/videos*",
+      "https://www.bloomberg.com/video*"
+    ],
+    "excludeSelectors.remove": ["aside"]
   },
   {
     "id": "baiduXueshu",
@@ -4431,6 +4450,7 @@
       "#more-replies",
       "#info",
       "#badges *",
+      ".html5-video-player",
       ".ytp-caption-window-container",
       ".read-frog-subtitles-view",
       ".read-frog-subtitles-state-message",

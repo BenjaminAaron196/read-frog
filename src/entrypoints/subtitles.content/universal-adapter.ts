@@ -571,7 +571,7 @@ export class UniversalVideoAdapter implements SubtitlesProvidersAdapter {
 
     const toggleButton = renderSubtitlesTranslateButton({ adapter: this })
 
-    if (this.config.embedded) {
+    if (this.config.embedded || this.config.controls?.insertPosition === "end") {
       container.appendChild(toggleButton)
     } else {
       container.insertBefore(toggleButton, container.firstChild)

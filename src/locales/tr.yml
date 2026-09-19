@@ -1111,7 +1111,7 @@ options:
       title: Temel ayarlar
       enable:
         title: Video altyazılarını aç
-        description: Oynatıcı kontrollerine bir çeviri düğmesi ekler. Şimdilik yalnızca YouTube destekleniyor.
+        description: Oynatıcı kontrollerine bir çeviri düğmesi ekler. YouTube, Bloomberg ve Reuters destekleniyor.
       autoStart:
         title: Video açılınca çevir
         description: Video yüklenir yüklenmez, düğmeye basmadan altyazıları çevirmeye başlar.

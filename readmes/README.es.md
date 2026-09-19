@@ -148,7 +148,7 @@ Así los términos técnicos se traducen correctamente, las expresiones literari
 
 ### 🎬 [Traducción de subtítulos][docs-tutorial]
 
-Traduce subtítulos de YouTube directamente en el reproductor. Puedes ver contenido en otros idiomas con la traducción junto al subtítulo original.
+Traduce subtítulos de YouTube, Bloomberg y Reuters directamente en el reproductor. Puedes ver contenido en otros idiomas con la traducción junto al subtítulo original.
 
 ### 🔊 [Texto a voz (TTS)][docs-tutorial]
 

@@ -31,7 +31,7 @@ function buildPlayer({ strayProgressBar = false } = {}) {
 
 function measureHeight(container: HTMLElement) {
   const { controls } = getYoutubeConfig({ mode: "watch" })
-  if (!controls) throw new Error("watch config has no controls")
+  if (!controls?.measureHeight) throw new Error("watch config has no controls height")
   return controls.measureHeight(container)
 }
 

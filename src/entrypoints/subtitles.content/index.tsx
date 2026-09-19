@@ -10,7 +10,15 @@ declare global {
 }
 
 export default defineContentScript({
-  matches: ["*://*.youtube.com/*", "*://*.youtube-nocookie.com/*"],
+  matches: [
+    "*://*.youtube.com/*",
+    "*://*.youtube-nocookie.com/*",
+    "*://*.bloomberg.com/*",
+    "*://*.reuters.com/*",
+  ],
+  // The live channels carry no caption track at all, so there is nothing for
+  // the overlay to show or translate there.
+  excludeMatches: ["*://*.bloomberg.com/live/*"],
   allFrames: true,
   cssInjectionMode: "manifest",
   async main(ctx) {

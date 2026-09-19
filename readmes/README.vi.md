@@ -148,7 +148,7 @@ Thuật ngữ kỹ thuật được dịch đúng trong lĩnh vực của nó, c
 
 ### 🎬 [Dịch phụ đề][docs-tutorial]
 
-Dịch phụ đề YouTube trực tiếp trong trình phát video. Khi xem nội dung nước ngoài, bản dịch sẽ hiển thị cùng phụ đề gốc để biến video thành tài liệu học ngôn ngữ.
+Dịch phụ đề YouTube, Bloomberg và Reuters trực tiếp trong trình phát video. Khi xem nội dung nước ngoài, bản dịch sẽ hiển thị cùng phụ đề gốc để biến video thành tài liệu học ngôn ngữ.
 
 ### 🔊 [Chuyển văn bản thành giọng nói (TTS)][docs-tutorial]
 
