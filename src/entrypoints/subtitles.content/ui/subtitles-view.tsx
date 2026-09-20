@@ -6,7 +6,6 @@ import { SUBTITLES_BOX_CLASS, SUBTITLES_VIEW_CLASS } from "@/utils/constants/sub
 import { cn } from "@/utils/styles/utils"
 import { displaySubtitleAtom } from "../atoms"
 import { MainSubtitle, TranslationSubtitle } from "./subtitle-lines"
-import { SubtitleMarkedGlosses } from "./subtitles-learning"
 import { useVerticalDrag } from "./use-vertical-drag"
 
 interface SubtitlesViewProps {
@@ -43,11 +42,6 @@ function SubtitlesContent() {
 
         <Activity mode={showTranslation ? "visible" : "hidden"}>
           <TranslationSubtitle className={translationAbove ? "order-1" : "order-2"} />
-        </Activity>
-
-        {/* The words this cue marks, with the meaning the translation needed. */}
-        <Activity mode={showMain ? "visible" : "hidden"}>
-          <SubtitleMarkedGlosses text={subtitle?.text ?? ""} />
         </Activity>
       </div>
     </div>

@@ -22,7 +22,6 @@ import {
 import { buildSubtitleMarkCss, SUBTITLE_WORD_CLASS } from "@/utils/learning-mode/styles"
 import { markSubtitleText } from "@/utils/learning-mode/subtitle-text"
 import {
-  describeDefinition,
   requestWordExplanation,
   resolveWordCardAi,
   saveWordToBook,
@@ -221,51 +220,6 @@ function tokenKeyed(tokens: SubtitleToken[]): { token: SubtitleToken; key: strin
     offset += token.text.length
     return { token, key }
   })
-}
-
-/**
- * The meanings of the words this cue marks, for the translation row.
- *
- * The source line says which words are above the reader's level; the translation
- * is where they are actually reading. Putting the glosses there means the reader
- * meets the meaning next to the translation that needed them, without a hover.
- */
-export function SubtitleMarkedGlosses({ text }: { text: string }) {
-  const runtime = useLearningSubtitleRuntime()
-
-  const glosses = useMemo(() => {
-    if (!runtime) return []
-    const seen = new Set<string>()
-    const found: { word: string; gloss: string }[] = []
-    for (const token of runtime.mark(text)) {
-      if (token.kind !== "word" || !token.match) continue
-      const word = token.match.entry.w
-      if (seen.has(word)) continue
-      seen.add(word)
-      const gloss = describeDefinition({
-        surface: token.text,
-        tier: token.match.tier,
-        entry: token.match.entry,
-        sentence: text,
-      })
-      if (gloss) found.push({ word: token.text, gloss })
-    }
-    return found
-  }, [runtime, text])
-
-  if (glosses.length === 0) return null
-
-  return (
-    <div className="flex flex-wrap items-baseline justify-center gap-x-3 gap-y-0.5 text-[0.62em] leading-snug text-white/80">
-      {glosses.map(({ word, gloss }) => (
-        <span key={word} className="whitespace-nowrap">
-          <span className="text-white/95">{word}</span>
-          <span className="mx-1 text-white/40">·</span>
-          {gloss}
-        </span>
-      ))}
-    </div>
-  )
 }
 
 export interface LearningSubtitleLineProps {
