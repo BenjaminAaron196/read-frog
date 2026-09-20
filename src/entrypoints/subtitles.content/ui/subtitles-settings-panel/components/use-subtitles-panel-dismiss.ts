@@ -1,38 +1,25 @@
 import type { RefObject } from "react"
 import { useEffect, useEffectEvent } from "react"
-import { TRANSLATE_BUTTON_CLASS, TRANSLATE_BUTTON_CONTAINER_ID } from "@/utils/constants/subtitles"
+import { REACT_SHADOW_HOST_CLASS } from "@/utils/constants/dom-labels"
 
 function isElement(value: EventTarget | null): value is Element {
   return value instanceof Element
 }
 
 /**
- * Popups that belong to the panel but are portalled out of it.
+ * Whether the press belongs to Read Frog's own interface.
  *
- * They mount at the shadow container's root so they aren't clipped by the panel's
- * `overflow-hidden`, which also puts them outside `panelRef` — a press inside one is
- * indistinguishable from a press on the page unless it is listed here. Miss an entry and the
- * symptom is the whole panel vanishing the moment you touch that popup.
- *
- * Add a `data-slot` to any new portalled popup and list it here.
+ * Every surface the extension renders - the panel, the frog that opens it, and
+ * anything portalled out of the panel (tooltips, selects, colour pickers,
+ * toasts, dialogs) - lives in a shadow host carrying this class. A press there
+ * is never a press on the page, so it must not dismiss the panel. Listing the
+ * portalled popups by `data-slot` instead meant every new popup had to be
+ * remembered here, and the symptom of forgetting was the panel vanishing the
+ * moment the reader touched that popup.
  */
-const PORTALLED_PANEL_POPUP_SELECTOR = [
-  "[data-slot='select-content']",
-  "[data-slot='color-picker-content']",
-  "[data-slot='color-picker-format-content']",
-  // The anchored toast, which hangs off a control inside the panel. Dismissing
-  // on a press here is worse than the usual symptom: closing the panel hides
-  // its anchor, base-ui marks the toast anchor-hidden, and the button the press
-  // was aimed at goes `visibility: hidden` before the click can land on it.
-  "[data-slot='toast-positioner']",
-].join(",")
-
-function isTranslateTriggerTarget(path: EventTarget[]) {
+function isReadFrogUi(path: EventTarget[]): boolean {
   return path.some(
-    (target) =>
-      isElement(target) &&
-      (target.id === TRANSLATE_BUTTON_CONTAINER_ID ||
-        target.classList.contains(TRANSLATE_BUTTON_CLASS)),
+    (target) => isElement(target) && target.classList.contains(REACT_SHADOW_HOST_CLASS),
   )
 }
 
@@ -54,12 +41,8 @@ export function useSubtitlesPanelDismiss({
 
     const path = event.composedPath()
     const clickedInsidePanel = !!panelRef.current && path.includes(panelRef.current)
-    const clickedTrigger = isTranslateTriggerTarget(path)
-    const clickedPanelPopup = path.some(
-      (target) => isElement(target) && target.matches(PORTALLED_PANEL_POPUP_SELECTOR),
-    )
 
-    if (clickedInsidePanel || clickedTrigger || clickedPanelPopup) {
+    if (clickedInsidePanel || isReadFrogUi(path)) {
       return
     }
 
