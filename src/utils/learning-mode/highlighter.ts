@@ -212,6 +212,37 @@ export class LearningHighlighter {
     return null
   }
 
+  /**
+   * Which mark covers a point on screen, measured from the marks themselves.
+   *
+   * The caret is the cheaper source, but it answers in layout space: inside an
+   * animated or transformed subtree it points at a sibling copy of the same
+   * text, and the card would then describe (and sit beside) a word the reader is
+   * not looking at. Geometry is the authority when the two disagree.
+   */
+  hitTestPoint(x: number, y: number, margin = 4): MarkedOccurrence | null {
+    let best: MarkedOccurrence | null = null
+    let bestArea = Number.POSITIVE_INFINITY
+    for (const occurrence of this.occurrences) {
+      const rect = occurrence.range.getBoundingClientRect()
+      if (rect.width === 0 && rect.height === 0) continue
+      if (
+        x < rect.left - margin ||
+        x > rect.right + margin ||
+        y < rect.top - margin ||
+        y > rect.bottom + margin
+      ) {
+        continue
+      }
+      const area = rect.width * rect.height
+      if (area < bestArea) {
+        best = occurrence
+        bestArea = area
+      }
+    }
+    return best
+  }
+
   reset(): void {
     this.occurrences = []
     this.byTextNode.clear()

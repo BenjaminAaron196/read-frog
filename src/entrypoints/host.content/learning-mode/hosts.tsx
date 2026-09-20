@@ -58,6 +58,11 @@ export interface CardHost {
   isPointerOverPoint(x: number, y: number): boolean
   /** Whether a card is on screen right now. */
   isVisible(): boolean
+  /**
+   * Move the open card to a new anchor without repainting it: the word it
+   * describes can travel (animated banners, reflow) while the pointer is still.
+   */
+  reposition(position: CardAnchor): void
   hide(): void
   destroy(): void
 }
@@ -248,6 +253,11 @@ export function createCardHost(handlers: CardHandlers): CardHost {
     },
     isVisible() {
       return current !== null
+    },
+    reposition(position) {
+      if (!current) return
+      anchor = position
+      place()
     },
     hide() {
       for (const timer of placeTimers) window.clearTimeout(timer)

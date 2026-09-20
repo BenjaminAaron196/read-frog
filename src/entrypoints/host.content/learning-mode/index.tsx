@@ -41,6 +41,12 @@ import {
 
 /** The pointer moves far more often than the hovered mark changes. */
 const HOVER_THROTTLE_MS = 60
+/**
+ * The word under a still pointer can still move: animated banners slide text
+ * under it, and those animations fire no scroll event. While a card is open its
+ * mark is re-measured on this cadence so the card cannot drift away from it.
+ */
+const ANCHOR_WATCH_MS = 200
 /** Grace period so the card survives the pointer travelling from the word to it. */
 const CARD_HIDE_DELAY_MS = 220
 
@@ -317,6 +323,7 @@ export async function startLearningMode(config: Config): Promise<LearningModeRun
   let lastPointer = { x: 0, y: 0 }
   let hideTimer: number | null = null
   let candidateTimer: number | null = null
+  let anchorWatch: number | null = null
   let lastMoveAt = 0
 
   const cancelHide = () => {
@@ -326,8 +333,15 @@ export async function startLearningMode(config: Config): Promise<LearningModeRun
     }
   }
 
+  const stopAnchorWatch = () => {
+    if (anchorWatch === null) return
+    window.clearInterval(anchorWatch)
+    anchorWatch = null
+  }
+
   const hideCard = () => {
     cancelHide()
+    stopAnchorWatch()
     highlighter.setHovered(null)
     hovered = null
     hoveredWord = null
@@ -344,6 +358,34 @@ export async function startLearningMode(config: Config): Promise<LearningModeRun
     hideTimer = window.setTimeout(hideCard, CARD_HIDE_DELAY_MS)
   }
 
+  const anchorOf = (occurrence: MarkedOccurrence): CardAnchor => {
+    const rect = occurrence.range.getBoundingClientRect()
+    return {
+      x: rect.left,
+      y: rect.bottom,
+      wordRect: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom },
+    }
+  }
+
+  /** Follows the mark the card belongs to, and gives up when it is gone. */
+  const watchAnchor = () => {
+    if (!hovered) return
+    const rect = hovered.range.getBoundingClientRect()
+    if (rect.width === 0 && rect.height === 0) {
+      hideCard()
+      return
+    }
+    if (
+      Math.abs(rect.left - lastPosition.wordRect.left) < 1 &&
+      Math.abs(rect.top - lastPosition.wordRect.top) < 1
+    ) {
+      return
+    }
+    lastPosition = anchorOf(hovered)
+    card.reposition(lastPosition)
+    observePointer(lastPointer.x, lastPointer.y)
+  }
+
   const openCard = (occurrence: MarkedOccurrence) => {
     cancelHide()
     const data = cardDataOf(occurrence)
@@ -356,13 +398,9 @@ export async function startLearningMode(config: Config): Promise<LearningModeRun
     // Every mark owns its own position: the same word appears many times on a
     // page, and the card belongs to the copy under the pointer.
     if (!wasOpen || previousId !== occurrence.id) {
-      const rect = occurrence.range.getBoundingClientRect()
-      lastPosition = {
-        x: rect.left,
-        y: rect.bottom,
-        wordRect: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom },
-      }
+      lastPosition = anchorOf(occurrence)
     }
+    if (anchorWatch === null) anchorWatch = window.setInterval(watchAnchor, ANCHOR_WATCH_MS)
     card.show(data, lastPosition, savedWords.has(data.entry.w))
     requestAi(data.entry.w, data)
   }
@@ -389,6 +427,31 @@ export async function startLearningMode(config: Config): Promise<LearningModeRun
    * over the card, so the card only moves once a different word has clearly been
    * under the pointer, and it never disappears while the pointer is on it.
    */
+  const containsPoint = (rect: DOMRect, x: number, y: number, margin = 4): boolean =>
+    x >= rect.left - margin &&
+    x <= rect.right + margin &&
+    y >= rect.top - margin &&
+    y <= rect.bottom + margin
+
+  /**
+   * The mark the pointer is on. The caret is cheap and usually right; inside an
+   * animated subtree it answers in layout space and can name a sibling copy of
+   * the same text, so its answer is only trusted when the mark's own box covers
+   * the pointer.
+   */
+  const resolveOccurrence = (
+    x: number,
+    y: number,
+    caret: { node: Node; offset: number } | null,
+  ): MarkedOccurrence | null => {
+    const fromCaret = caret ? highlighter.hitTest(caret.node, caret.offset) : null
+    if (fromCaret && containsPoint(fromCaret.range.getBoundingClientRect(), x, y)) {
+      return fromCaret
+    }
+    if (!caret) return null
+    return highlighter.hitTestPoint(x, y)
+  }
+
   const observePointer = (x: number, y: number) => {
     const now = performance.now()
     lastMoveAt = now
@@ -396,7 +459,7 @@ export async function startLearningMode(config: Config): Promise<LearningModeRun
 
     const overCard = card.isPointerOverPoint(x, y)
     const caret = overCard ? null : caretAtPoint(x, y)
-    const occurrence = caret ? highlighter.hitTest(caret.node, caret.offset) : null
+    const occurrence = overCard ? null : resolveOccurrence(x, y, caret)
 
     const decision = decideHover(hoverIntent, {
       occurrenceId: occurrence?.id ?? null,
@@ -471,6 +534,7 @@ export async function startLearningMode(config: Config): Promise<LearningModeRun
     stopped = true
     if (aiTimer !== null) window.clearTimeout(aiTimer)
     if (candidateTimer !== null) window.clearTimeout(candidateTimer)
+    stopAnchorWatch()
     scanner.stop()
     cancelHide()
     window.removeEventListener("mousemove", handlePointerMove)
