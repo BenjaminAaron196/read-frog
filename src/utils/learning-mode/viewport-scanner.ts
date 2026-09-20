@@ -1,5 +1,6 @@
 import type { LearningHighlighter } from "./highlighter"
 import type { WordMatcher } from "./lookup"
+import { TRANSLATED_CONTENT_CLASSES } from "@/utils/constants/dom-labels"
 import { scanTextNodes } from "./scanner"
 
 /**
@@ -77,10 +78,23 @@ function isCustomElement(element: Element): boolean {
   return element.tagName.includes("-")
 }
 
-/** Every element worth watching: the reading blocks, plus the custom elements. */
+/**
+ * Every element worth watching: the reading blocks, plus the custom elements
+ * inside them.
+ *
+ * The custom elements used to be found by scanning every element in the
+ * document, which on a large article is tens of thousands of nodes touched
+ * before a single word is marked. A custom element that holds prose sits inside
+ * the blocks we already look at, so the discovery is bounded by them.
+ */
 function collectCandidates(): Element[] {
   const blocks = [...document.querySelectorAll(CONTENT_BLOCK_SELECTOR)]
-  const custom = [...document.getElementsByTagName("*")].filter(isCustomElement)
+  const custom: Element[] = []
+  for (const block of blocks) {
+    for (const element of block.querySelectorAll("*")) {
+      if (isCustomElement(element)) custom.push(element)
+    }
+  }
   return custom.length === 0 ? blocks : [...blocks, ...custom]
 }
 
@@ -206,6 +220,11 @@ export function startViewportScanning(options: ViewportScannerOptions): Viewport
     for (const record of records) {
       for (const node of record.addedNodes) {
         if (!(node instanceof HTMLElement)) continue
+        // Translation inserts wrappers around the text it just translated. Those
+        // subtrees carry the same words the scanner already judged, and walking
+        // them again on every translated paragraph is what made the two features
+        // feed each other.
+        if (node.closest(`.${TRANSLATED_CONTENT_CLASSES}`)) continue
         const block =
           node.matches(CONTENT_BLOCK_SELECTOR) || isCustomElement(node)
             ? node

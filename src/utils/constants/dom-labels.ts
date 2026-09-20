@@ -1,6 +1,17 @@
 export const CONTENT_WRAPPER_CLASS = "read-frog-translated-content-wrapper"
 export const INLINE_CONTENT_CLASS = "read-frog-translated-inline-content"
 export const BLOCK_CONTENT_CLASS = "read-frog-translated-block-content"
+
+/**
+ * Everything the translator wraps its output in. The learning mode skips these
+ * subtrees: their text is text it has already judged, and re-walking it on every
+ * translated paragraph is a loop neither feature needs.
+ */
+export const TRANSLATED_CONTENT_CLASSES = [
+  CONTENT_WRAPPER_CLASS,
+  INLINE_CONTENT_CLASS,
+  BLOCK_CONTENT_CLASS,
+].join(", .")
 export const FLOAT_WRAP_ATTRIBUTE = "data-read-frog-float-wrap"
 
 export const WALKED_ATTRIBUTE = "data-read-frog-walked"

@@ -466,9 +466,18 @@ export async function startLearningMode(config: Config): Promise<LearningModeRun
     scheduleHide()
   }
 
-  /** The card is anchored to a rect that moves with the page, so a scroll ends it. */
+  /**
+   * The card is anchored to a rect that moves with the page, so a scroll ends it.
+   * The cached mark boxes move with it too, and the next hit test has to measure
+   * again rather than trust them.
+   */
   const handleScroll = () => {
+    highlighter.invalidateRects()
     if (hovered) hideCard()
+  }
+
+  const handleResize = () => {
+    highlighter.invalidateRects()
   }
 
   /**
@@ -486,6 +495,7 @@ export async function startLearningMode(config: Config): Promise<LearningModeRun
   window.addEventListener("mousemove", handlePointerMove, { passive: true })
   document.addEventListener("mouseleave", handlePointerLeave)
   window.addEventListener("scroll", handleScroll, { passive: true, capture: true })
+  window.addEventListener("resize", handleResize, { passive: true })
 
   const stop = () => {
     if (stopped) return
@@ -498,6 +508,7 @@ export async function startLearningMode(config: Config): Promise<LearningModeRun
     window.removeEventListener("mousemove", handlePointerMove)
     document.removeEventListener("mouseleave", handlePointerLeave)
     window.removeEventListener("scroll", handleScroll, { capture: true })
+    window.removeEventListener("resize", handleResize)
     card.destroy()
     highlighter.reset()
     removeLearningModeCss()

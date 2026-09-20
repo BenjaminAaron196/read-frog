@@ -64,6 +64,31 @@ export class LearningHighlighter {
 
   private knownFlash: MarkedOccurrence | null = null
 
+  /**
+   * The registry entries, kept alive between paints. Rebuilding them from the
+   * whole occurrence list after every scan batch is what made a large article
+   * stutter: thousands of ranges reallocated per batch. A `Highlight` is a set,
+   * so a paint only adds and removes what changed.
+   */
+  private tierHighlights: Record<LearningTier, Highlight> | null = null
+
+  private savedHighlight: Highlight | null = null
+
+  /** What each occurrence is currently painted as, so a paint can diff. */
+  private painted = new Map<MarkedOccurrence, LearningTier | "saved">()
+
+  private commitScheduled = false
+
+  /**
+   * Mark boxes, measured once per layout epoch. Hit-testing asks for a rect on
+   * every pointer move, and a rect read forces layout - on a page the translator
+   * is still writing to, that is the most expensive thing the hover path could
+   * do. The epoch is bumped when the page moves under the marks.
+   */
+  private rects = new Map<MarkedOccurrence, DOMRect>()
+
+  private rectEpoch = 0
+
   readonly supported: boolean =
     typeof CSS !== "undefined" && typeof CSS.highlights === "object" && CSS.highlights !== null
 
@@ -109,37 +134,89 @@ export class LearningHighlighter {
     this.savedWords = new Set(words)
   }
 
+  /**
+   * Publishes the marks, at most once per frame.
+   *
+   * A scan adds hundreds of ranges in a batch, and the page moves under them
+   * while a translation runs; painting on every batch is what kept the main
+   * thread busy. The work itself is incremental: a paint walks the occurrences
+   * and touches only the ones whose tier changed.
+   */
   commit(): void {
-    if (!this.supported) return
+    if (!this.supported || this.commitScheduled) return
+    this.commitScheduled = true
+    requestAnimationFrame(() => {
+      this.commitScheduled = false
+      this.paint()
+    })
+  }
 
-    const byTier: Record<LearningTier, Range[]> = { tier1: [], tier2: [], tier3: [] }
-    const saved: Range[] = []
+  /** Which registry entry an occurrence belongs in, right now. */
+  private slotFor(occurrence: MarkedOccurrence): LearningTier | "saved" | null {
+    if (!occurrence.range.startContainer.isConnected) return null
+    return this.savedWords.has(occurrence.entry.w) ? "saved" : occurrence.tier
+  }
+
+  private paint(): void {
+    this.ensureRegistry()
+    if (!this.tierHighlights || !this.savedHighlight) return
+
+    const entryFor = (slot: LearningTier | "saved"): Highlight =>
+      slot === "saved" ? this.savedHighlight! : this.tierHighlights![slot]
 
     for (const occurrence of this.occurrences) {
-      if (!occurrence.range.startContainer.isConnected) continue
-      if (this.savedWords.has(occurrence.entry.w)) {
-        saved.push(occurrence.range)
-        continue
-      }
-      byTier[occurrence.tier].push(occurrence.range)
+      const desired = this.slotFor(occurrence)
+      const current = this.painted.get(occurrence) ?? null
+      if (current === desired) continue
+
+      if (current) entryFor(current).delete(occurrence.range)
+      if (desired) entryFor(desired).add(occurrence.range)
+      if (desired) this.painted.set(occurrence, desired)
+      else this.painted.delete(occurrence)
     }
 
-    for (const tier of Object.keys(byTier) as LearningTier[]) {
-      const ranges = byTier[tier]
-      if (ranges.length === 0) {
-        CSS.highlights.delete(TIER_HIGHLIGHT_NAME[tier])
-        continue
-      }
-      CSS.highlights.set(TIER_HIGHLIGHT_NAME[tier], new Highlight(...ranges))
+    // Marks removed from the list entirely (a word the reader marked as known)
+    // are not in the loop above, so they are unpainted from here.
+    for (const [occurrence, current] of this.painted) {
+      if (this.occurrences.includes(occurrence)) continue
+      entryFor(current).delete(occurrence.range)
+      this.painted.delete(occurrence)
+      this.rects.delete(occurrence)
     }
 
-    if (saved.length === 0) {
-      CSS.highlights.delete(SAVED_HIGHLIGHT_NAME)
-    } else {
-      CSS.highlights.set(SAVED_HIGHLIGHT_NAME, new Highlight(...saved))
-    }
-
+    // The paint itself can move what the marks sit on; the next measurement is
+    // taken after that settles rather than reused.
+    this.invalidateRects()
     this.applyTransientHighlights()
+  }
+
+  private ensureRegistry(): void {
+    if (this.tierHighlights && this.savedHighlight) return
+    this.tierHighlights = {
+      tier1: new Highlight(),
+      tier2: new Highlight(),
+      tier3: new Highlight(),
+    }
+    this.savedHighlight = new Highlight()
+    for (const tier of Object.keys(this.tierHighlights) as LearningTier[]) {
+      CSS.highlights.set(TIER_HIGHLIGHT_NAME[tier], this.tierHighlights[tier])
+    }
+    CSS.highlights.set(SAVED_HIGHLIGHT_NAME, this.savedHighlight)
+  }
+
+  /** Marks every cached box stale; the next hit test measures afresh. */
+  invalidateRects(): void {
+    this.rectEpoch += 1
+    this.rects.clear()
+  }
+
+  /** The box of a mark, measured at most once per layout epoch. */
+  private rectOf(occurrence: MarkedOccurrence): DOMRect {
+    const cached = this.rects.get(occurrence)
+    if (cached) return cached
+    const rect = occurrence.range.getBoundingClientRect()
+    this.rects.set(occurrence, rect)
+    return rect
   }
 
   private applyTransientHighlights(): void {
@@ -227,7 +304,7 @@ export class LearningHighlighter {
     // actually on that word's box.
     for (const slot of slots) {
       if (offset !== slot.end) continue
-      if (point && !containsPoint(slot.occurrence.range.getBoundingClientRect(), point)) {
+      if (point && !containsPoint(this.rectOf(slot.occurrence), point)) {
         continue
       }
       return slot.occurrence
@@ -249,7 +326,7 @@ export class LearningHighlighter {
     // whose box does not cover the pointer, so the answer is a correction, not a
     // survey.
     for (const occurrence of this.occurrences) {
-      const rect = occurrence.range.getBoundingClientRect()
+      const rect = this.rectOf(occurrence)
       if (rect.width === 0 && rect.height === 0) continue
       if (
         x < rect.left - margin ||
@@ -269,6 +346,10 @@ export class LearningHighlighter {
     this.byTextNode.clear()
     this.hovered = null
     this.knownFlash = null
+    this.painted.clear()
+    this.rects.clear()
+    this.tierHighlights = null
+    this.savedHighlight = null
     if (!this.supported) return
     CSS.highlights.clear()
   }

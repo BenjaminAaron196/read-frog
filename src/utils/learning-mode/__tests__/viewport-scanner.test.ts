@@ -76,8 +76,12 @@ describe("viewport scanner", () => {
   it("marks the words in a custom element that holds prose", async () => {
     // YouTube renders a comment inside `<yt-attributed-string>`, whose text is its
     // own: neither a block tag nor a div, so it used to be invisible to the scan.
+    // It is discovered inside the block that contains it, not by scanning the
+    // whole document for elements with a hyphen in their name.
     expect(
-      await scan("<yt-attributed-string>the chancellor met the coalition</yt-attributed-string>"),
+      await scan(
+        '<div id="comment"><yt-attributed-string>the chancellor met the coalition</yt-attributed-string></div>',
+      ),
     ).toEqual(["chancellor", "coalition"])
   })
 
