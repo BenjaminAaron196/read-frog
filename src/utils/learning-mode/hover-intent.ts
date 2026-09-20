@@ -17,20 +17,24 @@
 export const HOVER_SWITCH_DELAY_MS = 140
 
 export interface HoverIntent {
-  /** Headword the card currently shows; null when no card is open. */
-  word: string | null
-  /** A different headword seen under the pointer, waiting out the switch delay. */
-  candidateWord: string | null
+  /** The mark the card belongs to; null when no card is open. */
+  occurrenceId: number | null
+  /** A different mark seen under the pointer, waiting out the switch delay. */
+  candidateId: number | null
   candidateSince: number
 }
 
 export function createHoverIntent(): HoverIntent {
-  return { word: null, candidateWord: null, candidateSince: 0 }
+  return { occurrenceId: null, candidateId: null, candidateSince: 0 }
 }
 
 export interface HoverObservation {
-  /** Headword under the caret, or null when the pointer is not over a mark. */
-  word: string | null
+  /**
+   * The mark under the caret, or null when the pointer is not over one. Identity
+   * matters, not the headword: the same word appears many times on a page, and
+   * the card has to follow the pointer from one copy to the next.
+   */
+  occurrenceId: number | null
   now: number
   /** The pointer is over the card itself: it must never be taken away there. */
   isPointerOverCard: boolean
@@ -56,37 +60,42 @@ export interface HoverDecision {
  * the tests to name what happened.
  */
 export function decideHover(intent: HoverIntent, observation: HoverObservation): HoverDecision {
-  const { word, now, isPointerOverCard, isWithinOpenWordRect } = observation
+  const { occurrenceId, now, isPointerOverCard, isWithinOpenWordRect } = observation
 
   // Reaching for the card's buttons is the point of the delay; never hide there.
   if (isPointerOverCard) {
     return { action: "keep", intent }
   }
 
-  if (word === null) {
-    // An empty caret inside the word the card was opened on is measurement
+  if (occurrenceId === null) {
+    // An empty caret inside the mark the card was opened on is measurement
     // noise, not a pointer that left.
-    if (intent.word !== null && isWithinOpenWordRect) {
+    if (intent.occurrenceId !== null && isWithinOpenWordRect) {
       return { action: "keep", intent }
     }
     return { action: "hide", intent: createHoverIntent() }
   }
 
-  if (word === intent.word) {
-    return { action: "keep", intent: { ...intent, candidateWord: null, candidateSince: 0 } }
+  // Still on the mark the card describes - including its outer pixels, where the
+  // caret may already resolve to the neighbour.
+  if (occurrenceId === intent.occurrenceId || isWithinOpenWordRect) {
+    return { action: "keep", intent: { ...intent, candidateId: null, candidateSince: 0 } }
   }
 
-  if (intent.word === null) {
-    return { action: "open", intent: { word, candidateWord: null, candidateSince: 0 } }
+  if (intent.occurrenceId === null) {
+    return { action: "open", intent: { occurrenceId, candidateId: null, candidateSince: 0 } }
   }
 
-  if (intent.candidateWord === word && now - intent.candidateSince >= HOVER_SWITCH_DELAY_MS) {
-    return { action: "switch", intent: { word, candidateWord: null, candidateSince: 0 } }
+  if (intent.candidateId === occurrenceId && now - intent.candidateSince >= HOVER_SWITCH_DELAY_MS) {
+    return { action: "switch", intent: { occurrenceId, candidateId: null, candidateSince: 0 } }
   }
 
-  if (intent.candidateWord === word) {
+  if (intent.candidateId === occurrenceId) {
     return { action: "keep", intent }
   }
 
-  return { action: "keep", intent: { word: intent.word, candidateWord: word, candidateSince: now } }
+  return {
+    action: "keep",
+    intent: { occurrenceId: intent.occurrenceId, candidateId: occurrenceId, candidateSince: now },
+  }
 }

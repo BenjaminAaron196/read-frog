@@ -31,7 +31,13 @@ import { logger } from "@/utils/logger"
 import { sendMessage } from "@/utils/message"
 import { getWordInContextPrompt } from "@/utils/prompts/word-in-context"
 import { urlMatchesPattern } from "@/utils/url-pattern"
-import { createCardHost, createHintHost, type HintHost, type HintCounts } from "./hosts"
+import {
+  createCardHost,
+  createHintHost,
+  type CardAnchor,
+  type HintHost,
+  type HintCounts,
+} from "./hosts"
 
 /** The pointer moves far more often than the hovered mark changes. */
 const HOVER_THROTTLE_MS = 60
@@ -307,7 +313,7 @@ export async function startLearningMode(config: Config): Promise<LearningModeRun
     },
   })
 
-  let lastPosition = { x: 0, y: 0 }
+  let lastPosition: CardAnchor = { x: 0, y: 0, wordRect: { left: 0, top: 0, right: 0, bottom: 0 } }
   let lastPointer = { x: 0, y: 0 }
   let hideTimer: number | null = null
   let candidateTimer: number | null = null
@@ -341,19 +347,21 @@ export async function startLearningMode(config: Config): Promise<LearningModeRun
   const openCard = (occurrence: MarkedOccurrence) => {
     cancelHide()
     const data = cardDataOf(occurrence)
-    const previousWord = hoveredWord
+    const previousId = hovered?.id ?? null
     const wasOpen = card.isVisible()
     hovered = occurrence
     hoveredWord = data.entry.w
     highlighter.setHovered(occurrence)
 
-    // A second copy of the *same* word keeps the card where the reader already
-    // found it - re-anchoring would make it jump between the copies. A different
-    // word follows the pointer, otherwise the new content would appear under the
-    // old word.
-    if (!wasOpen || previousWord !== data.entry.w) {
+    // Every mark owns its own position: the same word appears many times on a
+    // page, and the card belongs to the copy under the pointer.
+    if (!wasOpen || previousId !== occurrence.id) {
       const rect = occurrence.range.getBoundingClientRect()
-      lastPosition = { x: rect.left, y: rect.bottom }
+      lastPosition = {
+        x: rect.left,
+        y: rect.bottom,
+        wordRect: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom },
+      }
     }
     card.show(data, lastPosition, savedWords.has(data.entry.w))
     requestAi(data.entry.w, data)
@@ -391,19 +399,18 @@ export async function startLearningMode(config: Config): Promise<LearningModeRun
     const occurrence = caret ? highlighter.hitTest(caret.node, caret.offset) : null
 
     const decision = decideHover(hoverIntent, {
-      word: occurrence?.entry.w ?? null,
+      occurrenceId: occurrence?.id ?? null,
       now,
       isPointerOverCard: overCard,
       isWithinOpenWordRect: isPointInsideCurrentRect(x, y),
     })
     hoverIntent = decision.intent
-
     if (decision.action === "keep") {
       cancelHide()
       // A pointer that lands on a new word and then stops still has to switch:
       // observations arrive only on movement, so the wait is finished by a timer
       // that re-reads the caret where the pointer already is.
-      if (hoverIntent.candidateWord !== null) {
+      if (hoverIntent.candidateId !== null) {
         scheduleCandidateCheck(HOVER_SWITCH_DELAY_MS - (now - hoverIntent.candidateSince))
       }
       return
@@ -425,7 +432,7 @@ export async function startLearningMode(config: Config): Promise<LearningModeRun
     candidateTimer = window.setTimeout(
       () => {
         candidateTimer = null
-        if (stopped || hoverIntent.candidateWord === null) return
+        if (stopped || hoverIntent.candidateId === null) return
         observePointer(lastPointer.x, lastPointer.y)
       },
       Math.max(20, delayMs),

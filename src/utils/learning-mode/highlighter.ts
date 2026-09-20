@@ -7,6 +7,8 @@ import type { LearningDictionaryEntry, LearningMatch, LearningTier } from "./typ
  * React's reconciliation.
  */
 export interface MarkedOccurrence {
+  /** Stable for the page's lifetime: two copies of a word are different marks. */
+  id: number
   range: Range
   tier: LearningTier
   entry: LearningDictionaryEntry
@@ -38,6 +40,7 @@ interface OccurrenceSlot {
  */
 export class LearningHighlighter {
   private occurrences: MarkedOccurrence[] = []
+  private nextId = 0
 
   private byTextNode = new Map<Text, OccurrenceSlot[]>()
 
@@ -63,7 +66,9 @@ export class LearningHighlighter {
   }
 
   add(range: Range, match: LearningMatch, sentence: string): void {
+    this.nextId += 1
     const occurrence: MarkedOccurrence = {
+      id: this.nextId,
       range,
       tier: match.tier,
       entry: match.entry,

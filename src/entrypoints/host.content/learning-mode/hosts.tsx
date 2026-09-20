@@ -41,8 +41,15 @@ function createHost(
   }
 }
 
+/** Where the card goes: the word's own box, so it can never be covered. */
+export interface CardAnchor {
+  x: number
+  y: number
+  wordRect: { left: number; top: number; right: number; bottom: number }
+}
+
 export interface CardHost {
-  show(data: WordCardData, position: { x: number; y: number }, saved: boolean): void
+  show(data: WordCardData, position: CardAnchor, saved: boolean): void
   /** The AI half arrives after the local half, so it repaints the open card. */
   setAi(ai: WordCardAiState): void
   /** True when the event came from inside the card (its own buttons included). */
@@ -62,6 +69,50 @@ export interface CardHandlers {
   onIgnore(data: WordCardData): void
 }
 
+const CARD_MARGIN = 8
+/** Distance between the card and the word it describes. */
+const CARD_GAP = 8
+
+interface Box {
+  left: number
+  top: number
+  right: number
+  bottom: number
+}
+
+/**
+ * How deeply two boxes collide on their shallowest axis, 0 when they are apart.
+ * Ranking sides by penetration (rather than by "does it touch") keeps the choice
+ * meaningful when every side is crowded: the least buried one wins.
+ */
+function penetration(a: Box, b: Box): number {
+  const x = Math.min(a.right, b.right) - Math.max(a.left, b.left)
+  const y = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top)
+  return x > 0 && y > 0 ? Math.min(x, y) : 0
+}
+
+/**
+ * Wikipedia's own link previews ("Page Previews"). They appear next to the same
+ * links the reader hovers, a moment after the pointer lands, so the card has to
+ * step aside rather than land on top of them.
+ */
+function previewObstacle(): Box | null {
+  let union: Box | null = null
+  for (const element of document.querySelectorAll(".mwe-popups, #mwe-popups-svg")) {
+    const rect = element.getBoundingClientRect()
+    if (rect.width === 0 || rect.height === 0) continue
+    union = union
+      ? {
+          left: Math.min(union.left, rect.left),
+          top: Math.min(union.top, rect.top),
+          right: Math.max(union.right, rect.right),
+          bottom: Math.max(union.bottom, rect.bottom),
+        }
+      : { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom }
+  }
+  return union
+}
+
 /**
  * The hover card is one React root that is re-rendered with whatever mark the
  * pointer is over, rather than one root per word: a page can carry thousands of
@@ -75,20 +126,68 @@ export function createCardHost(handlers: CardHandlers): CardHost {
   let current: { data: WordCardData; saved: boolean } | null = null
   let aiState: WordCardAiState = { status: "idle" }
   /** Where the card belongs relative to the word it describes. */
-  let anchor: { x: number; y: number } | null = null
+  let anchor: CardAnchor | null = null
+  let placeTimers: number[] = []
+  let sizeObserver: ResizeObserver | undefined
 
   const place = () => {
     if (!anchor) return
-    // Measured, not estimated: the card grows when the AI answer lands, and a
-    // guessed height would leave it sitting over the word (and the pointer).
-    const height = host.element.getBoundingClientRect().height
-    const fitsBelow = anchor.y + height + 12 <= window.innerHeight
-    const top = fitsBelow
-      ? anchor.y + 8
-      : Math.max(8, Math.min(anchor.y - height - 8, window.innerHeight - height - 8))
-    const left = Math.min(Math.max(8, anchor.x), Math.max(8, window.innerWidth - 344))
-    host.element.style.left = `${left}px`
+    // Measured, not estimated: the card grows when the answer for the sentence
+    // and the AI half land, and a guessed height would leave it sitting over the
+    // word it describes.
+    const box = host.element.getBoundingClientRect()
+    const width = box.width
+    const height = box.height
+    const viewport = { width: window.innerWidth, height: window.innerHeight }
+    const word = anchor.wordRect
+    const obstacle = previewObstacle()
+
+    const candidate = (left_: number, top: number): Box => {
+      // Each side is clamped on its own: clamping once, after the choice, would
+      // drag a card that belongs beside the word back under it.
+      const left = Math.min(
+        Math.max(CARD_MARGIN, left_),
+        Math.max(CARD_MARGIN, viewport.width - width - CARD_MARGIN),
+      )
+      return { left, top, right: left + width, bottom: top + height }
+    }
+    const onScreen = (box_: Box) =>
+      box_.left >= CARD_MARGIN &&
+      box_.right + CARD_MARGIN <= viewport.width &&
+      box_.top >= CARD_MARGIN &&
+      box_.bottom + CARD_MARGIN <= viewport.height
+
+    // Beside the word first (the page's own previews do the same, and it leaves
+    // the lines below the word reachable), then below it, then above it. Each
+    // side is measured from the word's own box, so none of them can land on the
+    // word the card is describing.
+    const ranked = [
+      candidate(word.right + CARD_GAP, word.top),
+      candidate(anchor.x, anchor.y + CARD_GAP),
+      candidate(anchor.x, word.top - height - CARD_GAP),
+    ].map((box_) => ({
+      box: box_,
+      offScreen: onScreen(box_) ? 0 : 1,
+      onObstacle: obstacle ? penetration(box_, obstacle) : 0,
+      onWord: penetration(box_, word),
+    }))
+    // Stable sort, so sides that are equally good keep the preferred order.
+    ranked.sort(
+      (a, b) => a.offScreen - b.offScreen || a.onObstacle - b.onObstacle || a.onWord - b.onWord,
+    )
+    const chosen = ranked[0]?.box ?? candidate(anchor.x, anchor.y + CARD_GAP)
+    const top = Math.min(
+      Math.max(CARD_MARGIN, chosen.top),
+      Math.max(CARD_MARGIN, viewport.height - height - CARD_MARGIN),
+    )
+    host.element.style.left = `${chosen.left}px`
     host.element.style.top = `${top}px`
+  }
+
+  /** Placement has to survive content that lands late (answers, images, fonts). */
+  if (typeof ResizeObserver !== "undefined") {
+    sizeObserver = new ResizeObserver(() => place())
+    sizeObserver.observe(host.element)
   }
 
   const render = () => {
@@ -119,15 +218,21 @@ export function createCardHost(handlers: CardHandlers): CardHost {
 
   return {
     show(data, position, saved) {
-      const isSameWord = current?.data.entry.w === data.entry.w
+      const isSameMark =
+        current?.data.entry.w === data.entry.w &&
+        anchor?.x === position.x &&
+        anchor?.y === position.y
       current = { data, saved }
-      // A different word re-anchors; the same word keeps the card where the
-      // reader already found it, so moving along one word cannot make it jump.
-      if (!isSameWord) {
-        aiState = { status: "idle" }
-        anchor = position
-      }
+      // The caller decides when the card moves (it knows the mark under the
+      // pointer); a repaint of the same mark keeps the AI half that is already
+      // on screen instead of dropping back to a spinner.
+      if (!isSameMark) aiState = { status: "idle" }
+      anchor = position
       render()
+      // Wikipedia's previews show up a moment after the pointer stops, so the
+      // placement is re-checked once they have had their chance to appear.
+      for (const timer of placeTimers) window.clearTimeout(timer)
+      placeTimers = [window.setTimeout(place, 350), window.setTimeout(place, 900)]
     },
     setAi(ai) {
       aiState = ai
@@ -145,6 +250,8 @@ export function createCardHost(handlers: CardHandlers): CardHost {
       return current !== null
     },
     hide() {
+      for (const timer of placeTimers) window.clearTimeout(timer)
+      placeTimers = []
       if (!current) return
       current = null
       anchor = null
