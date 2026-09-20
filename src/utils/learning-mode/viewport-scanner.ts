@@ -14,10 +14,13 @@ import { scanTextNodes } from "./scanner"
 const SCAN_MARGIN = "1200px 0px"
 
 /**
- * The elements worth scanning: leaf-level reading units only. Container
- * elements (article, section, div) are deliberately absent — scanning one of
- * those walks its whole subtree, which is the full-page pass this module exists
- * to avoid.
+ * The elements worth looking at. `div` is here because sites disagree about what
+ * a paragraph is: Reuters renders the article body as `<div
+ * data-testid="paragraph">`, and plenty of others use plain divs, so a selector
+ * without it silently marks the page furniture and nothing else.
+ *
+ * Watching a div is not the same as scanning it: `isReadingUnit` keeps the
+ * containers out, so only a div that holds the text itself is ever walked.
  */
 const CONTENT_BLOCK_SELECTOR = [
   "p",
@@ -34,7 +37,42 @@ const CONTENT_BLOCK_SELECTOR = [
   "h6",
   "blockquote",
   "figcaption",
+  "div",
 ].join(",")
+
+/**
+ * Elements that make a div a container rather than a paragraph. A container
+ * would drag its whole subtree into one scan, which is the full-page pass this
+ * module exists to avoid, so a div holding any of these is skipped.
+ */
+const NESTED_BLOCK_SELECTOR = [
+  "p",
+  "div",
+  "li",
+  "ul",
+  "ol",
+  "dl",
+  "section",
+  "article",
+  "aside",
+  "table",
+  "figure",
+  "blockquote",
+  "pre",
+  "form",
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6",
+].join(",")
+
+/** Whether an element is a reading unit: a block, or a div that is its own text. */
+function isReadingUnit(element: Element): boolean {
+  if (element.tagName !== "DIV") return true
+  return element.querySelector(NESTED_BLOCK_SELECTOR) === null
+}
 
 export interface ViewportScannerOptions {
   matcher: WordMatcher
@@ -128,6 +166,7 @@ export function startViewportScanning(options: ViewportScannerOptions): Viewport
           for (const entry of entries) {
             if (!entry.isIntersecting) continue
             observer?.unobserve(entry.target)
+            if (!isReadingUnit(entry.target)) continue
             queue(entry.target)
           }
         },
@@ -139,7 +178,9 @@ export function startViewportScanning(options: ViewportScannerOptions): Viewport
     for (const block of blocks) observer.observe(block)
   } else {
     // No observer (jsdom, ancient engines): fall back to one pass, chunked.
-    for (const block of blocks) pending.add(block)
+    for (const block of blocks) {
+      if (isReadingUnit(block)) pending.add(block)
+    }
     flush()
   }
 
@@ -150,7 +191,7 @@ export function startViewportScanning(options: ViewportScannerOptions): Viewport
         const block = node.matches(CONTENT_BLOCK_SELECTOR)
           ? node
           : node.querySelector(CONTENT_BLOCK_SELECTOR)
-        if (block) queue(block)
+        if (block && isReadingUnit(block)) queue(block)
       }
     }
   })
