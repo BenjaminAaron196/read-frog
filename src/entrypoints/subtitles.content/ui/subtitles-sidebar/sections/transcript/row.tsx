@@ -3,7 +3,6 @@ import type { TranscriptLine } from "@/utils/subtitles/transcript"
 import { memo } from "react"
 import { cn } from "@/utils/styles/utils"
 import { formatTimestamp } from "@/utils/subtitles/transcript"
-import { LearningText } from "../../../subtitles-learning"
 
 interface TranscriptRowProps {
   line: TranscriptLine
@@ -38,9 +37,7 @@ export const TranscriptRow = memo(function TranscriptRow({
           isActive ? "text-foreground" : "text-foreground/85",
         )}
       >
-        {/* The source line carries the learning mode's marks, the same ones the
-            overlay shows: the sidebar is where a reader reads the transcript. */}
-        <LearningText text={line.text} />
+        {line.text}
       </span>
       {line.translation && (
         <span
