@@ -71,6 +71,22 @@ function isPointerOverExtensionUi(x: number, y: number): boolean {
   return hit.id.startsWith("read-frog")
 }
 
+/**
+ * The same question, answered from the event the pointer already produced.
+ *
+ * `elementFromPoint` is a layout read, and this runs on every pointer move; on a
+ * page the translator is still writing to, that is the most expensive thing the
+ * hover path does. The event's own path is the same information, already
+ * computed by the browser.
+ */
+function isPointerOverExtensionUiEvent(event: MouseEvent): boolean {
+  return event.composedPath().some((target) => {
+    if (!(target instanceof Element)) return false
+    if (target.classList.contains("read-frog-react-shadow-host")) return true
+    return target.id.startsWith("read-frog")
+  })
+}
+
 /** Caret hit-testing across engines: Firefox exposes the standard API, Chromium the legacy one. */
 function caretAtPoint(x: number, y: number): { node: Node; offset: number } | null {
   const position = document.caretPositionFromPoint?.(x, y)
@@ -408,15 +424,21 @@ export async function startLearningMode(config: Config): Promise<LearningModeRun
     return highlighter.hitTestPoint(x, y)
   }
 
-  const observePointer = (x: number, y: number) => {
+  const observePointer = (x: number, y: number, event?: MouseEvent) => {
     const now = performance.now()
     lastMoveAt = now
     lastPointer = { x, y }
 
-    const overCard = card.isPointerOverPoint(x, y)
+    // With an event in hand, both questions are answered from its path: no
+    // `elementFromPoint`, no layout read, on the move path.
+    const overCard = event ? card.isPointerOver(event) : card.isPointerOverPoint(x, y)
     // Read Frog's own panels cover the page: the words behind them are not the
     // reader's target, and hit-testing them costs a scan per pointer move.
-    const overOwnUi = !overCard && isPointerOverExtensionUi(x, y)
+    const overOwnUi = !overCard
+      ? event
+        ? isPointerOverExtensionUiEvent(event)
+        : isPointerOverExtensionUi(x, y)
+      : false
     const caret = overCard || overOwnUi ? null : caretAtPoint(x, y)
     const occurrence = overCard || overOwnUi ? null : resolveOccurrence(x, y, caret)
 
@@ -446,7 +468,7 @@ export async function startLearningMode(config: Config): Promise<LearningModeRun
 
   const handlePointerMove = (event: MouseEvent) => {
     if (performance.now() - lastMoveAt < HOVER_THROTTLE_MS) return
-    observePointer(event.clientX, event.clientY)
+    observePointer(event.clientX, event.clientY, event)
   }
 
   const scheduleCandidateCheck = (delayMs: number) => {
