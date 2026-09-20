@@ -1,4 +1,5 @@
 import type { LearningDictionaryEntry, LearningTier } from "@/utils/learning-mode/types"
+import type { WordCardAiResult } from "@/utils/learning-mode/word-card-schema"
 import { RiVolumeUpLine } from "@remixicon/react"
 import { i18n } from "@/utils/i18n"
 
@@ -8,6 +9,16 @@ export interface WordCardData {
   tier: LearningTier
   entry: LearningDictionaryEntry
   sentence: string
+}
+
+/**
+ * The AI half of the card. `loading` is shown the moment the request starts so
+ * the reader sees the card react, and a `null` result reads as "the model had
+ * nothing to add" rather than a failure.
+ */
+export interface WordCardAiState {
+  status: "idle" | "loading" | "ready" | "error"
+  result?: WordCardAiResult | null
 }
 
 /**
@@ -66,6 +77,7 @@ function Senses({ entry }: { entry: LearningDictionaryEntry }) {
 export function WordCard({
   data,
   saved,
+  ai,
   onSpeak,
   onSave,
   onKnow,
@@ -73,6 +85,7 @@ export function WordCard({
 }: {
   data: WordCardData
   saved: boolean
+  ai: WordCardAiState
   onSpeak: () => void
   onSave: () => void
   onKnow: () => void
@@ -118,6 +131,39 @@ export function WordCard({
       </div>
 
       <Senses entry={data.entry} />
+
+      {ai.status === "loading" ? (
+        <p className="mt-2 animate-pulse text-xs text-muted-foreground">
+          {i18n.t("learningMode.card.aiThinking")}
+        </p>
+      ) : null}
+
+      {ai.status === "error" ? (
+        <p className="mt-2 text-xs text-muted-foreground">{i18n.t("learningMode.card.aiFailed")}</p>
+      ) : null}
+
+      {ai.status === "ready" && ai.result ? (
+        <div className="mt-2 space-y-1">
+          <p className="text-[11px] font-medium text-muted-foreground">
+            {i18n.t("learningMode.card.contextualTitle")}
+          </p>
+          <p className="text-sm leading-snug">{ai.result.contextual}</p>
+          {ai.result.senses.length > 0 ? (
+            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+              <span className="font-medium">{i18n.t("learningMode.card.otherSenses")}</span>
+              {ai.result.senses.map((sense) => (
+                <span key={`${sense.pos}-${sense.meaning}`}>
+                  {sense.pos ? `${sense.pos} ` : ""}
+                  {sense.meaning}
+                </span>
+              ))}
+            </div>
+          ) : null}
+          {ai.result.note ? (
+            <p className="text-xs text-muted-foreground">{ai.result.note}</p>
+          ) : null}
+        </div>
+      ) : null}
 
       {data.sentence ? (
         <div className="mt-2 border-l-2 pl-2">

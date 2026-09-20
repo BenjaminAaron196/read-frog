@@ -53,6 +53,17 @@ export function DisplaySection() {
       </ConfigItem>
 
       <ConfigItem
+        id="learning-mode-display-min-tier"
+        title={i18n.t("learningMode.display.minTier")}
+        description={i18n.t("learningMode.display.minTierDescription")}
+      >
+        <Switch
+          checked={display.minTier === "tier2"}
+          onCheckedChange={(checked) => saveDisplay({ minTier: checked ? "tier2" : "all" })}
+        />
+      </ConfigItem>
+
+      <ConfigItem
         id="learning-mode-display-underline"
         title={i18n.t("learningMode.display.underline")}
         description={i18n.t("learningMode.display.underlineDescription")}

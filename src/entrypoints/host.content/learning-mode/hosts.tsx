@@ -5,7 +5,7 @@ import { NOTRANSLATE_CLASS, REACT_SHADOW_HOST_CLASS } from "@/utils/constants/do
 import { i18n } from "@/utils/i18n"
 import { LocaleBoundary } from "@/utils/i18n/locale-boundary"
 import { ShadowHostBuilder } from "@/utils/react-shadow-host/shadow-host-builder"
-import { WordCard, type WordCardData } from "./word-card"
+import { WordCard, type WordCardAiState, type WordCardData } from "./word-card"
 
 /**
  * Both surfaces live in their own shadow hosts: the page's styles cannot reach
@@ -43,6 +43,8 @@ function createHost(
 
 export interface CardHost {
   show(data: WordCardData, position: { x: number; y: number }, saved: boolean): void
+  /** The AI half arrives after the local half, so it repaints the open card. */
+  setAi(ai: WordCardAiState): void
   hide(): void
   destroy(): void
 }
@@ -65,6 +67,7 @@ export function createCardHost(handlers: CardHandlers): CardHost {
   document.body.appendChild(host.element)
 
   let current: { data: WordCardData; saved: boolean } | null = null
+  let aiState: WordCardAiState = { status: "idle" }
 
   const render = () => {
     if (!current) {
@@ -78,6 +81,7 @@ export function createCardHost(handlers: CardHandlers): CardHost {
           <WordCard
             data={data}
             saved={saved}
+            ai={aiState}
             onSpeak={() => handlers.onSpeak(data)}
             onSave={() => handlers.onSave(data)}
             onKnow={() => handlers.onKnow(data)}
@@ -91,6 +95,7 @@ export function createCardHost(handlers: CardHandlers): CardHost {
   return {
     show(data, position, saved) {
       current = { data, saved }
+      aiState = { status: "idle" }
       // Flip above the mark when the card would run off the bottom of the viewport.
       const estimatedHeight = 260
       const top =
@@ -102,9 +107,15 @@ export function createCardHost(handlers: CardHandlers): CardHost {
       host.element.style.top = `${top}px`
       render()
     },
+    setAi(ai) {
+      aiState = ai
+      if (!current) return
+      render()
+    },
     hide() {
       if (!current) return
       current = null
+      aiState = { status: "idle" }
       render()
     },
     destroy() {

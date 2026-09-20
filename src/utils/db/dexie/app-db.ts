@@ -8,6 +8,7 @@ import BatchRequestRecord from "./tables/batch-request-record"
 import Glossary from "./tables/glossary"
 import GlossarySyncSnapshot from "./tables/glossary-sync-snapshot"
 import GlossaryTerm from "./tables/glossary-term"
+import LearningWordCacheEntry from "./tables/learning-word-cache"
 import LearningWordStateEntry from "./tables/learning-word-state"
 import TranslationCache from "./tables/translation-cache"
 import WordBookEntry from "./tables/word-book"
@@ -30,6 +31,8 @@ export default class AppDB extends Dexie {
   wordBook!: EntityTable<WordBookEntry, "id">
 
   learningWordState!: EntityTable<LearningWordStateEntry, "word">
+
+  learningWordCache!: EntityTable<LearningWordCacheEntry, "key">
 
   constructor() {
     super(`${upperCamelCase(APP_NAME)}DB`)
@@ -247,6 +250,51 @@ export default class AppDB extends Dexie {
       learningWordState: `
         word`,
     })
+    // v9 adds the word card's AI answers, keyed by word + sentence + provider
+    // (see `background/learning-mode.ts`). A cache, not user data, so it is
+    // disposable — but rows are stored as text, which keeps a later change to
+    // the result shape from making old rows unreadable. Dexie creates the store;
+    // every version must still restate the full store set, so the nine above are
+    // repeated verbatim.
+    this.version(9).stores({
+      translationCache: `
+        key,
+        translation,
+        createdAt`,
+      batchRequestRecord: `
+        key,
+        createdAt,
+        originalRequestCount,
+        provider,
+        model`,
+      articleSummaryCache: `
+        key,
+        createdAt`,
+      aiSegmentationCache: `
+        key,
+        createdAt`,
+      glossary: `
+        id,
+        enabled,
+        createdAt`,
+      glossaryTerm: `
+        id,
+        glossaryId,
+        &[glossaryId+targetLang+matchKey],
+        enabled,
+        updatedAt`,
+      glossarySyncSnapshot: `
+        id`,
+      wordBook: `
+        id,
+        syncStatus,
+        addedAt`,
+      learningWordState: `
+        word`,
+      learningWordCache: `
+        key,
+        createdAt`,
+    })
     this.translationCache.mapToClass(TranslationCache)
     this.batchRequestRecord.mapToClass(BatchRequestRecord)
     this.articleSummaryCache.mapToClass(ArticleSummaryCache)
@@ -256,5 +304,6 @@ export default class AppDB extends Dexie {
     this.glossarySyncSnapshot.mapToClass(GlossarySyncSnapshot)
     this.wordBook.mapToClass(WordBookEntry)
     this.learningWordState.mapToClass(LearningWordStateEntry)
+    this.learningWordCache.mapToClass(LearningWordCacheEntry)
   }
 }

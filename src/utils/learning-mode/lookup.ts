@@ -81,6 +81,12 @@ export interface CreateWordMatcherOptions {
   profile: LearningProfile
   /** Every lowercased form the reader has marked known or ignored. */
   suppressedWords: ReadonlySet<string>
+  /**
+   * `tier2` is the quiet mode for vocabulary-dense pages: tier-1 words are the
+   * ones a reader half-knows, and on a technical article they can cover most of
+   * a paragraph.
+   */
+  minTier?: "all" | "tier2"
 }
 
 /**
@@ -95,6 +101,7 @@ export function createWordMatcher({
   index,
   profile,
   suppressedWords,
+  minTier = "all",
 }: CreateWordMatcherOptions): WordMatcher {
   const verdicts = new Map<string, LearningMatch | null>()
 
@@ -114,7 +121,7 @@ export function createWordMatcher({
         suppressedWords.has(entry.w) || (entry.l !== undefined && suppressedWords.has(entry.l))
       if (!entryIsSuppressed && !isBelowAlwaysKnownThreshold(entry)) {
         const tier = classifyEntry(entry, profile)
-        if (tier) {
+        if (tier && !(minTier === "tier2" && tier === "tier1")) {
           match = { tier, entry, surface: token }
         }
       }

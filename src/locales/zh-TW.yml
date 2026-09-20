@@ -1452,6 +1452,10 @@ learningMode:
     hard: 較難
     beyond: 超綱
   card:
+    contextualTitle: 本文釋義
+    aiThinking: 正在生成…
+    aiFailed: 沒能取得模型回覆
+    otherSenses: 其他義項
     addToWordBook: 加入生詞本
     savedToWordBookHint: 已在生詞本中
     iKnowThis: 我認識
@@ -1461,7 +1465,7 @@ learningMode:
     frequency: 詞頻
     noDefinition: 本地詞典沒有這個詞條
   hint:
-    summary: "本頁 $1 個生詞"
+    summary: 本頁 $1 個生詞
     hide: 本頁不再顯示
   profile:
     title: 難度檔
@@ -1476,10 +1480,9 @@ learningMode:
     cefrDescription: 高於該等級的詞會被標註，等級本身視為已掌握。
     vocabSize: 詞彙量
     vocabSizeDescription: 標註最常見 $1-$2 詞之外的詞。
-    vocabSizeError: "請輸入 $1 到 $2 之間的數字"
+    vocabSizeError: 請輸入 $1 到 $2 之間的數字
   display:
     title: 標註樣式
-    description: 標註在頁面上怎麼顯示。
     showDensityHint: 在頁首顯示生詞數
     showDensityHintDescription: 正文開頭一行，說明本頁標出了多少個詞。
     intensity: 標註強度
@@ -1488,12 +1491,22 @@ learningMode:
     underlineDescription: 給標註的詞加底線。
     wash: 底色
     washDescription: 給標註的詞加淺底色。
+    minTier: 標註範圍
+    minTierDescription: 在詞彙密集的頁面上，只標難度較高的詞能讓正文更好讀。
+    minTierAll: 標註所有高於我程度的詞
+    minTierHard: 只標較難的
+  ai:
+    title: 智慧釋義
+    enable: 給出本句中的含義
+    enableDescription: 向網頁翻譯所用的模型詢問這個詞在本句中的意思，並依詞與句子快取結果。
+    maxPerPageDescription: 限制單一頁面可以詢問多少個詞；每個詞與句子的結果都會被快取。
+    maxPerPage: 每頁最多請求次數
   exclude:
     title: 不標註的頁面
     description: 每行一個網址比對模式，語法與站點規則相同；有一行無法比對就會拒絕整次編輯。
-    placeholder: |-
-      *.example.com
-      example.com/news/*
+    placeholder: "*.example.com
+
+      example.com/news/*"
   examTags:
     zk: 中考
     gk: 高考
@@ -1516,20 +1529,50 @@ learningMode:
       size: 大小
       importedAt: 匯入時間
       source: 來源
+    sources:
+      title: 下載來源
+      description: 每行一個 URL，也可以用逗號分隔。哪個來源先回應就用哪個；每個來源都要能提供 manifest.json 以及它旁邊的變體檔案。
+      placeholder: "https://dictionary.example.com/
+
+        https://cdn.example.com/readfrog/"
+      invalid: 這不是 http(s) URL：$1
     variant:
       title: 變體
-      description: 在輕量與完整之間切換需要匯入對應變體的檔案；已匯入的詞庫不會被自動轉換。
+      description: 選擇器決定下載哪個變體、本機匯入接受哪個檔案；已匯入的詞庫不會被自動轉換。
     import:
       title: 從本機檔案匯入
       description: 建置腳本產出的詞庫製品 —— 一個含 meta 與 entries 的 .json 檔案。
       action: 選擇檔案
       importing: 正在讀取檔案...
-      success: "已匯入 $1 條詞條（$2）"
+      success: 已匯入 $1 條詞條（$2）
       invalidFile: 這不是 Read Frog 的詞庫檔案。
-      variantMismatch: "這個檔案是$1版。請把上面的變體切到$1再匯入。"
-      truncated: "檔案宣告有 $1，實際只有 $2，代表下載不完整。"
-      entryCountMismatch: "檔案宣告有 $1 條詞條，實際只有 $2 條，代表檔案不完整。"
+      variantMismatch: 這個檔案是$1版。請把上面的變體切到$1再匯入。
+      truncated: 檔案宣告有 $1，實際只有 $2，代表下載不完整。
       invalidEntries: 第 $1 條沒有可用的（小寫）詞頭，這個檔案不是 Read Frog 寫出的。
+    download:
+      title: 下載
+      description: 從第一個能回應的來源下載所選變體，用發佈的 sha256 校驗收到的內容，校驗通過後才寫入。
+      action: 一鍵下載並匯入
+      downloading: 正在下載...
+      check: 重新檢查來源
+      checking: 正在檢查...
+      progress: $1 / $2（$3%）
+      progressUnknown: 已下載 $1
+      success: 已下載並匯入 $1 條詞條（$2）
+      imported: 已從 $1 匯入版本 $2 —— $3 條詞條（$4）
+      failed: 下載失敗
+      noSources: 請在上方新增一個下載來源，或在下方從本機檔案匯入。
+      invalidSource: 這個下載來源不是 http(s) URL：$1
+      networkError: 無法存取 $1，請檢查網址和網路連線。
+      httpError: $1 回傳了 HTTP $2。
+      emptyResponse: $1 沒有回傳詞庫檔案。
+      invalidManifest: $1 不是可讀的詞庫清單（manifest）。
+      variantMissing: 該來源沒有提供 $1 版。
+      sizeMismatch: 清單裡這個版本是 $1，但檔案自稱 $2。沒有匯入任何內容。
+      checksumMismatch: 下載內容的 sha256 是 $2，清單發佈的是 $1。沒有匯入任何內容。
+      entryCountMismatch: 應有 $1 條詞條，實際只有 $2 條。沒有匯入任何內容。
+      checkFound: $1 提供版本 $2 —— $3 條詞條（$4）
+      checkCurrent: 這正是你已經匯入的版本。
     clear:
       title: 移除詞庫
       description: 移除後到再次匯入之前不再標註，檔案本身不受影響。

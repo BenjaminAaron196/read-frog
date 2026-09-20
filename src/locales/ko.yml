@@ -1286,6 +1286,10 @@ learningMode:
     hard: Harder
     beyond: Beyond your level
   card:
+    contextualTitle: In this sentence
+    aiThinking: Asking the model…
+    aiFailed: Could not reach the model
+    otherSenses: Other senses
     addToWordBook: Save to word book
     savedToWordBookHint: Saved to your word book
     iKnowThis: I know this
@@ -1295,7 +1299,7 @@ learningMode:
     frequency: Frequency
     noDefinition: No definition in the local dictionary
   hint:
-    summary: "$1 words on this page"
+    summary: $1 words on this page
     hide: Hide for this page
   profile:
     title: Difficulty profile
@@ -1310,10 +1314,9 @@ learningMode:
     cefrDescription: Words above this band are marked; the band itself is treated as known.
     vocabSize: Vocabulary size
     vocabSizeDescription: Words outside the $1-$2 most frequent ones are marked.
-    vocabSizeError: "Enter a number between $1 and $2"
+    vocabSizeError: Enter a number between $1 and $2
   display:
     title: Marks
-    description: How the marks look on the page.
     showDensityHint: Show the word count at the top of the page
     showDensityHintDescription: One line above the article saying how many words were marked here.
     intensity: Mark strength
@@ -1322,12 +1325,22 @@ learningMode:
     underlineDescription: Underlines marked words.
     wash: Background
     washDescription: Adds a light background behind marked words.
+    minTier: Detail
+    minTierDescription: On vocabulary-dense pages, marking only the harder words keeps the text readable.
+    minTierAll: Mark every word above my level
+    minTierHard: Only the harder ones
+  ai:
+    title: Explanations
+    enable: Explain the word in this sentence
+    enableDescription: Asks the page-translation model for the meaning the word carries here, and caches the answer per word and sentence.
+    maxPerPageDescription: Counts how many words one page may ask about; each answer is cached per word and sentence.
+    maxPerPage: Requests per page
   exclude:
     title: Pages that stay unmarked
     description: One URL pattern per line, same syntax as the site rules. A line Read Frog cannot match rejects the whole edit.
-    placeholder: |-
-      *.example.com
-      example.com/news/*
+    placeholder: "*.example.com
+
+      example.com/news/*"
   examTags:
     zk: Zhongkao
     gk: Gaokao
@@ -1350,20 +1363,50 @@ learningMode:
       size: Size
       importedAt: Imported
       source: Source
+    sources:
+      title: Download sources
+      description: One URL per line, or separated by commas. The first source that answers is the one used, and every source has to serve manifest.json with the variant files next to it.
+      placeholder: "https://dictionary.example.com/
+
+        https://cdn.example.com/readfrog/"
+      invalid: "That is not an http(s) URL: $1"
     variant:
       title: Variant
-      description: Switching between lite and full means importing that variant's file; an imported dictionary is never converted.
+      description: The picker decides which variant a download fetches and which file a local import accepts; an imported dictionary is never converted.
     import:
       title: Import from a local file
       description: The dictionary artifact the build script writes — a .json file holding meta and entries.
       action: Choose file
       importing: Reading the file...
-      success: "Imported $1 entries ($2)"
+      success: Imported $1 entries ($2)
       invalidFile: That file is not a Read Frog dictionary artifact.
-      variantMismatch: "That file is the $1 variant. Pick $1 above, then import it again."
-      truncated: "The file declares $1 but is only $2, so it arrived incomplete."
-      entryCountMismatch: "The file declares $1 entries but carries $2, so it arrived incomplete."
-      invalidEntries: "Entry $1 has no usable lower-case headword, so Read Frog did not write this file."
+      variantMismatch: That file is the $1 variant. Pick $1 above, then import it again.
+      truncated: The file declares $1 but is only $2, so it arrived incomplete.
+      invalidEntries: Entry $1 has no usable lower-case headword, so Read Frog did not write this file.
+    download:
+      title: Download
+      description: Fetches the selected variant from the first source that answers, checks the published sha256 against what arrived, and only then stores it.
+      action: Download and import
+      downloading: Downloading...
+      check: Re-check source
+      checking: Checking...
+      progress: $1 / $2 ($3%)
+      progressUnknown: $1 downloaded
+      success: Downloaded and imported $1 entries ($2)
+      imported: Imported version $2 from $1 — $3 entries ($4)
+      failed: The download failed
+      noSources: Add a source above to download the dictionary, or import a file below.
+      invalidSource: "That source is not an http(s) URL: $1"
+      networkError: Could not reach $1. Check the URL and your connection.
+      httpError: $1 answered HTTP $2.
+      emptyResponse: $1 sent no dictionary file.
+      invalidManifest: $1 is not a readable dictionary manifest.
+      variantMissing: The source serves no $1 build.
+      sizeMismatch: The manifest lists $1 for this build, but the artifact declares $2. Nothing was imported.
+      checksumMismatch: The download hashes to $2, the manifest published $1. Nothing was imported.
+      entryCountMismatch: Expected $1 entries, but the artifact carries $2. Nothing was imported.
+      checkFound: $1 serves version $2 — $3 entries ($4)
+      checkCurrent: This is the build you have imported.
     clear:
       title: Remove dictionary
       description: Marks stop until another file is imported. The file itself is untouched.

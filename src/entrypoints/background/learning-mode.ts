@@ -1,7 +1,10 @@
 import type { LearningWordState } from "@/utils/learning-mode/types"
 import { db } from "@/utils/db/dexie/db"
+import { Sha256Hex } from "@/utils/hash"
 import { clearDictionary, readDictionaryMeta } from "@/utils/learning-mode/lookup"
+import { parseWordCardAiResult } from "@/utils/learning-mode/word-card-schema"
 import { onMessage } from "@/utils/message"
+import { generateTextForProviderRef } from "./background-stream"
 
 /**
  * Everything the learning mode keeps outside the page.
@@ -50,4 +53,37 @@ export function setupLearningModeMessageHandlers(): void {
   onMessage("learningDictionaryStatus", () => readDictionaryMeta())
 
   onMessage("learningDictionaryClear", () => clearDictionary())
+
+  /**
+   * The word card's contextual answer. Cached by word + sentence + provider:
+   * the page repeats the same sentence as the reader scans, and a hover is a
+   * cheap event that must not become an API call each time it happens.
+   */
+  onMessage("learningWordExplain", async ({ data }) => {
+    const providerIdentity = `${data.providerRef.config.provider}:${data.providerRef.config.id}`
+    const cacheKey = Sha256Hex(data.word.toLowerCase(), data.sentence, providerIdentity)
+
+    const cached = await db.learningWordCache.get(cacheKey)
+    if (cached) {
+      const parsed = parseWordCardAiResult(cached.payload)
+      if (parsed) return parsed
+    }
+
+    const text = await generateTextForProviderRef({
+      providerRef: data.providerRef,
+      instructions: data.instructions,
+      prompt: data.prompt,
+      maxRetries: 0,
+    })
+
+    const result = parseWordCardAiResult(text)
+    if (!result) return null
+    await db.learningWordCache.put({
+      key: cacheKey,
+      payload: JSON.stringify(result),
+      createdAt: Date.now(),
+    })
+
+    return result
+  })
 }

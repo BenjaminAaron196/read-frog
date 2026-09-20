@@ -27,6 +27,7 @@ import type {
   LearningWordState,
   LearningWordStateKind,
 } from "@/utils/learning-mode/types"
+import type { WordCardAiResult } from "@/utils/learning-mode/word-card-schema"
 import type {
   NotionDatabaseListResult,
   NotionDatabaseResult,
@@ -126,6 +127,19 @@ interface ProtocolMap {
   }) => Promise<void>
   learningWordStateClear: (data: { word: string }) => Promise<void>
   learningDictionaryStatus: () => Promise<LearningDictionaryMeta | null>
+  /**
+   * The word card's contextual meaning. The caller composes the prompt (it owns
+   * the reader's language settings); the background owns the cache and the
+   * provider call.
+   */
+  learningWordExplain: (data: {
+    word: string
+    sentence: string
+    providerRef: Extract<PromptableProviderRef, { kind: "local" }>
+    instructions: string
+    prompt: string
+  }) => Promise<WordCardAiResult | null>
+
   learningDictionaryClear: () => Promise<void>
   notionTestConnection: (data: { apiKey: string }) => Promise<NotionUserResult>
   notionListDatabases: (data: { apiKey: string }) => Promise<NotionDatabaseListResult>

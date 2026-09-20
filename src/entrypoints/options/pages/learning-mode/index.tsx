@@ -8,6 +8,7 @@ import { i18n } from "@/utils/i18n"
 import { getUserSitePatternError } from "@/utils/url-pattern"
 import { ConfigItem } from "../../components/config-item"
 import { PageLayout } from "../../components/page-layout"
+import { AiSection } from "./ai-section"
 import { DictionarySection } from "./dictionary-section"
 import { DisplaySection } from "./display-section"
 import { ProfileSection } from "./profile-section"
@@ -94,6 +95,7 @@ export function LearningModePage() {
       <LearningModeEnableItem />
       <ProfileSection />
       <DisplaySection />
+      <AiSection />
       <ExcludedPatternsItem />
       <DictionarySection />
     </PageLayout>

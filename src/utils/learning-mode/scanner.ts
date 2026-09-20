@@ -49,6 +49,12 @@ export interface ScanOptions {
   highlighter: LearningHighlighter
   maxHighlights: number
   shouldContinue?: () => boolean
+  /**
+   * Text nodes already looked at in this run. The viewport scanner walks the
+   * page in pieces as the reader scrolls, so without this every later piece
+   * would re-judge the same text — and re-add the same ranges.
+   */
+  visited?: WeakSet<Text>
 }
 
 export interface ScanResult {
@@ -65,7 +71,7 @@ export interface ScanResult {
  * past that point the extras cost more (paint, hit-testing) than they inform.
  */
 export async function scanTextNodes(root: ParentNode, options: ScanOptions): Promise<ScanResult> {
-  const { matcher, highlighter, maxHighlights, shouldContinue } = options
+  const { matcher, highlighter, maxHighlights, shouldContinue, visited } = options
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
 
   let nodes = 0
@@ -79,6 +85,10 @@ export async function scanTextNodes(root: ParentNode, options: ScanOptions): Pro
     const text = node as Text
     const parent = text.parentElement
     if (!parent || parent.closest(SKIP_SELECTOR)) continue
+    if (visited) {
+      if (visited.has(text)) continue
+      visited.add(text)
+    }
 
     const content = text.data
     if (content.length < 3 || !/[A-Za-z]/.test(content)) continue

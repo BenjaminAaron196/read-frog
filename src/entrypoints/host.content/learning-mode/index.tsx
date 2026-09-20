@@ -3,6 +3,7 @@ import type { Config } from "@/types/config/config"
 import type { LearningTier, LearningWordState } from "@/utils/learning-mode/types"
 import type { WordBookRecord } from "@/utils/word-book/types"
 import { browser } from "#imports"
+import { isLLMProviderConfig } from "@/types/config/provider"
 import { getRandomUUID } from "@/utils/crypto-polyfill"
 import { LearningHighlighter, type MarkedOccurrence } from "@/utils/learning-mode/highlighter"
 import {
@@ -13,19 +14,18 @@ import {
   readDictionaryEntries,
   readDictionaryMeta,
 } from "@/utils/learning-mode/lookup"
-import { scanTextNodes } from "@/utils/learning-mode/scanner"
 import {
   applyLearningModeCss,
   buildLearningModeCss,
   removeLearningModeCss,
 } from "@/utils/learning-mode/styles"
+import { startViewportScanning } from "@/utils/learning-mode/viewport-scanner"
 import { logger } from "@/utils/logger"
 import { sendMessage } from "@/utils/message"
+import { getWordInContextPrompt } from "@/utils/prompts/word-in-context"
 import { urlMatchesPattern } from "@/utils/url-pattern"
 import { createCardHost, createHintHost, type HintHost, type HintCounts } from "./hosts"
 
-/** Page changes arrive in bursts; one scan per burst is enough. */
-const RESCAN_DEBOUNCE_MS = 400
 /** The pointer moves far more often than the hovered mark changes. */
 const HOVER_THROTTLE_MS = 60
 /** Grace period so the card survives the pointer travelling from the word to it. */
@@ -115,6 +115,22 @@ export async function startLearningMode(config: Config): Promise<LearningModeRun
     profile: learningConfig.profile,
     suppressedWords: suppressed,
   })
+
+  /**
+   * The AI half of the card runs on the page-translation provider: it is the
+   * LLM the reader already chose for prose, and a pure translate provider
+   * (Google, DeepL) simply has no word cards.
+   */
+  const aiProviderRow = config.providersConfig.find(
+    (row) => row.id === config.pageTranslation.providerId,
+  )
+  const aiProvider =
+    aiProviderRow && isLLMProviderConfig(aiProviderRow)
+      ? { kind: "local" as const, config: aiProviderRow }
+      : null
+  const aiEnabled = learningConfig.ai.enabled && aiProvider !== null
+  const aiTried = new Set<string>()
+  let aiBudget = learningConfig.ai.maxRequestsPerPage
 
   applyLearningModeCss(buildLearningModeCss(learningConfig.display))
   highlighter.setSavedWords(savedWords)
@@ -208,6 +224,57 @@ export async function startLearningMode(config: Config): Promise<LearningModeRun
 
   let hovered: MarkedOccurrence | null = null
   let hoveredData: WordCardData | null = null
+  let aiTimer: number | null = null
+
+  /**
+   * Asks for the meaning in this sentence, once per word per page. The request
+   * is delayed so a pointer crossing a paragraph does not fire one per word,
+   * and the reply is dropped when the reader has moved on — the card always
+   * describes the word under the pointer.
+   */
+  const requestAi = (occurrence: MarkedOccurrence, data: WordCardData) => {
+    if (!aiEnabled || aiProvider === null) return
+    if (aiBudget <= 0 || aiTried.has(data.entry.w)) return
+    if (!data.sentence) return
+
+    aiTried.add(data.entry.w)
+    aiBudget -= 1
+
+    if (aiTimer !== null) window.clearTimeout(aiTimer)
+    aiTimer = window.setTimeout(() => {
+      aiTimer = null
+      if (stopped || hovered !== occurrence) return
+
+      const prompt = getWordInContextPrompt({
+        word: data.entry.w,
+        sentence: data.sentence,
+        pageTitle: document.title,
+        sourceLang: config.language.sourceCode === "auto" ? "eng" : config.language.sourceCode,
+        targetLang: config.language.targetCode,
+        langLevel: config.language.level,
+      })
+
+      card.setAi({ status: "loading" })
+
+      void (async () => {
+        try {
+          const result = await sendMessage("learningWordExplain", {
+            word: data.entry.w,
+            sentence: data.sentence,
+            providerRef: aiProvider,
+            instructions: prompt.systemPrompt,
+            prompt: prompt.prompt,
+          })
+          if (stopped || hovered !== occurrence) return
+          card.setAi({ status: "ready", result })
+        } catch (error) {
+          logger.warn("[LearningMode] Word card request failed", error)
+          if (stopped || hovered !== occurrence) return
+          card.setAi({ status: "error" })
+        }
+      })()
+    }, 350)
+  }
 
   const card = createCardHost({
     onSpeak: (data) => void speak(data),
@@ -269,6 +336,7 @@ export async function startLearningMode(config: Config): Promise<LearningModeRun
     const rect = occurrence.range.getBoundingClientRect()
     lastPosition = { x: rect.left, y: rect.bottom }
     card.show(hoveredData, lastPosition, savedWords.has(hoveredData.entry.w))
+    requestAi(occurrence, hoveredData)
   }
 
   const handlePointerLeave = (event: MouseEvent) => {
@@ -279,56 +347,27 @@ export async function startLearningMode(config: Config): Promise<LearningModeRun
 
   const cardHostElement = document.getElementById("read-frog-learning-card-host")
 
-  // The scan and the page's own churn share one queue: a rescan waits for the
-  // previous one, so a fast SPA cannot stack scans on top of each other.
-  let scanChain: Promise<void> = Promise.resolve()
-  const enqueueScan = (roots: ParentNode[]) => {
-    scanChain = scanChain.then(async () => {
-      if (stopped) return
-      for (const root of roots) {
-        if (root instanceof Element && root.id.startsWith("read-frog")) continue
-        await scanTextNodes(root, {
-          matcher,
-          highlighter,
-          maxHighlights: learningConfig.maxHighlightsPerPage,
-          shouldContinue,
-        })
-      }
-      highlighter.commit()
-      refreshHint()
-    })
-  }
-
-  enqueueScan([document.body])
-  await scanChain
-
-  const pendingRoots = new Set<Element>()
-  let rescanTimer: number | null = null
-  const mutations = new MutationObserver((records) => {
-    for (const record of records) {
-      for (const node of record.addedNodes) {
-        if (node instanceof HTMLElement) pendingRoots.add(node)
-      }
-    }
-    if (pendingRoots.size === 0) return
-    if (rescanTimer !== null) window.clearTimeout(rescanTimer)
-    rescanTimer = window.setTimeout(() => {
-      const roots = [...pendingRoots]
-      pendingRoots.clear()
-      rescanTimer = null
-      enqueueScan(roots)
-    }, RESCAN_DEBOUNCE_MS)
+  /**
+   * Marks arrive as the reader approaches each block. The mutation and observer
+   * plumbing that used to live here moved into the scanner, which owns both the
+   * "scan what is near" policy and the "never judge a text node twice" set.
+   */
+  const scanner = startViewportScanning({
+    matcher,
+    highlighter,
+    maxHighlights: learningConfig.maxHighlightsPerPage,
+    shouldContinue,
+    onProgress: refreshHint,
   })
 
-  mutations.observe(document.body, { childList: true, subtree: true })
   window.addEventListener("mousemove", handlePointerMove, { passive: true })
   document.addEventListener("mouseleave", handlePointerLeave)
 
   const stop = () => {
     if (stopped) return
     stopped = true
-    mutations.disconnect()
-    if (rescanTimer !== null) window.clearTimeout(rescanTimer)
+    if (aiTimer !== null) window.clearTimeout(aiTimer)
+    scanner.stop()
     cancelHide()
     window.removeEventListener("mousemove", handlePointerMove)
     document.removeEventListener("mouseleave", handlePointerLeave)
@@ -338,7 +377,7 @@ export async function startLearningMode(config: Config): Promise<LearningModeRun
     removeLearningModeCss()
   }
 
-  logger.info("[LearningMode] Started", { entries: entries.length, marks: highlighter.count })
+  logger.info("[LearningMode] Started", { entries: entries.length })
 
   return {
     markCount: () => highlighter.count,

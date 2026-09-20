@@ -34,7 +34,14 @@ export const DEFAULT_LEARNING_MODE_CONFIG = {
      */
     underline: true,
     wash: true,
+    minTier: "all" as const,
   },
+  ai: {
+    enabled: true,
+    maxRequestsPerPage: 20,
+  },
+  /** Empty until the reader points them at a host; the local file import always works. */
+  dictionarySources: [] as string[],
   /** Site patterns where the learning mode stays off; same syntax as site rules. */
   excludedPatterns: [] as string[],
   /**
@@ -50,7 +57,13 @@ export const DEFAULT_LEARNING_MODE_CONFIG = {
     intensity: number
     underline: boolean
     wash: boolean
+    minTier: "all" | "tier2"
   }
+  ai: {
+    enabled: boolean
+    maxRequestsPerPage: number
+  }
+  dictionarySources: string[]
   excludedPatterns: string[]
   maxHighlightsPerPage: number
 }
