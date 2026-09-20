@@ -15,6 +15,16 @@ import { scanTextNodes } from "./scanner"
 const SCAN_MARGIN = "1200px 0px"
 
 /**
+ * Blocks one slice may take from the queue.
+ *
+ * A page that renders a feed can add blocks faster than they are scanned, and an
+ * unbounded queue turns that into one long walk - the spike the viewport policy
+ * exists to avoid. A slice takes a bounded batch and the rest stays queued, so
+ * the work per frame has a ceiling without any block being forgotten.
+ */
+const MAX_ROOTS_PER_SLICE = 24
+
+/**
  * The elements worth looking at. `div` is here because sites disagree about what
  * a paragraph is: Reuters renders the article body as `<div
  * data-testid="paragraph">`, and plenty of others use plain divs, so a selector
@@ -171,9 +181,19 @@ export function startViewportScanning(options: ViewportScannerOptions): Viewport
   const flush = () => {
     if (stopped || capped) return
     if (pending.size === 0) return
-    const roots = [...pending]
-    pending.clear()
-    void scan(roots)
+
+    const roots: Element[] = []
+    for (const element of pending) {
+      roots.push(element)
+      if (roots.length >= MAX_ROOTS_PER_SLICE) break
+    }
+    for (const root of roots) pending.delete(root)
+
+    void scan(roots).then(() => {
+      // Whatever was left over is taken by the next slice, not by this one.
+      const first = roots[0]
+      if (!stopped && !capped && pending.size > 0 && first) queue(first)
+    })
   }
 
   const queue = (element: Element) => {
