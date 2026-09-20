@@ -1,5 +1,4 @@
 import { z } from "zod"
-import { BUILT_IN_SUBTITLE_TRANSLATE_PROMPT_IDS } from "@/utils/constants/prompt"
 import {
   MAX_BACKGROUND_OPACITY,
   MAX_FONT_SCALE,
@@ -14,10 +13,11 @@ import {
   MAX_CUSTOM_CSS_LENGTH,
   pageTranslationShortcutSchema,
   requestQueueConfigSchema,
+  SELECTABLE_SUBTITLE_PROMPT_IDS,
 } from "./translate"
 
 export const subtitleCustomPromptsConfigSchema = createCustomPromptsConfigSchema(
-  BUILT_IN_SUBTITLE_TRANSLATE_PROMPT_IDS,
+  SELECTABLE_SUBTITLE_PROMPT_IDS,
 )
 
 export const subtitlesDisplayModeSchema = z.enum(["bilingual", "originalOnly", "translationOnly"])

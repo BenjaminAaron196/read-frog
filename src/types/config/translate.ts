@@ -17,11 +17,13 @@ import {
   MIN_TRANSLATE_RATE,
   MIN_WORDS_PER_NODE,
 } from "@/utils/constants/translate"
+import { TRANSLATE_STYLE_IDS } from "@/utils/constants/translate-style-prompts"
 import { TRANSLATION_NODE_STYLE } from "@/utils/constants/translation-node-style"
 import {
   isPageTranslationShortcutEmpty,
   isValidConfiguredPageTranslationShortcut,
 } from "@/utils/page-translation-shortcut"
+import { SMART_TRANSLATE_PROMPT_ID } from "@/utils/translate/style-router"
 
 export const requestQueueConfigSchema = z.object({
   capacity: z.number().gte(MIN_TRANSLATE_CAPACITY),
@@ -166,8 +168,26 @@ export function createCustomPromptsConfigSchema(builtInPromptIds: readonly strin
   )
 }
 
+/**
+ * The ids a stored selection may name: the prompts a surface owns, plus the
+ * smart request and the genre styles it can resolve to. Without them the picker
+ * cannot store "smart" at all - the write is rejected and the control springs
+ * back to the previous value.
+ */
+export const SELECTABLE_PAGE_PROMPT_IDS = [
+  ...BUILT_IN_PAGE_TRANSLATE_PROMPT_IDS,
+  SMART_TRANSLATE_PROMPT_ID,
+  ...TRANSLATE_STYLE_IDS,
+]
+
+export const SELECTABLE_SUBTITLE_PROMPT_IDS = [
+  DEFAULT_TRANSLATE_PROMPT_ID,
+  SMART_TRANSLATE_PROMPT_ID,
+  ...TRANSLATE_STYLE_IDS,
+]
+
 export const pageCustomPromptsConfigSchema = createCustomPromptsConfigSchema(
-  BUILT_IN_PAGE_TRANSLATE_PROMPT_IDS,
+  SELECTABLE_PAGE_PROMPT_IDS,
 )
 
 // Backwards-compatible export for the shared prompt configurator. Page
