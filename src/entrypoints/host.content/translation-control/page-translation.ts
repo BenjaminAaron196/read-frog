@@ -69,7 +69,7 @@ import {
 } from "@/utils/providers/provider-ref"
 import { removeReactShadowHost } from "@/utils/react-shadow-host/create-shadow-host"
 import { isTranslationCancelledError } from "@/utils/request/cancellation"
-import { createWorkPacer } from "@/utils/scheduler"
+import { createWorkPacer, type WorkPacer } from "@/utils/scheduler"
 import { getEffectiveSiteRule } from "@/utils/site-rules/effective"
 
 type SimpleIntersectionOptions = Omit<IntersectionObserverInit, "threshold"> & {
@@ -157,6 +157,8 @@ export class PageTranslationManager implements IPageTranslationManager {
   private lazyDispatch: LazyDispatchQueue | null = null
   /** Config used by the next dispatch slice; refreshed by the queue per slice. */
   private dispatchConfig: Config | null = null
+  /** Shared by every unit one dispatch slice starts, so the slice stays bounded. */
+  private slicePacer: WorkPacer | null = null
   private readonly dispatchReachPx: number
   private mutationObservers: MutationObserver[] = []
   private observedMutationRoots = new WeakSet<Node>()
@@ -345,13 +347,17 @@ export class PageTranslationManager implements IPageTranslationManager {
       const isWalkCurrent = () => this.isPageTranslating && this.walkId === walkId
 
       // Paragraphs the observer reports are *queued*, not translated on the
-      // spot: translation runs during idle slices, one unit at a time, only
-      // once the unit is within reach of the viewport, and never while the
-      // document is hidden (see lazy-dispatch.ts). What the reader eventually
-      // gets is unchanged — a paragraph is translated as they approach it.
+      // spot: translation runs during idle slices, only once the unit is
+      // within reach of the viewport, and never while the document is hidden
+      // (see lazy-dispatch.ts). What the reader eventually gets is unchanged —
+      // a paragraph is translated as they approach it.
       const lazyDispatch = createLazyDispatchQueue({
         isEligible: (unit) => this.isWithinDispatchReach(unit),
         beforeSlice: async () => {
+          // One pacer per slice, shared by every unit the slice starts: the
+          // slice's synchronous expansion work stays inside a single 12ms
+          // budget however many units it hands out (#1881).
+          this.slicePacer = createWorkPacer()
           this.dispatchConfig = (await getLocalConfig()) ?? this.dispatchConfig
         },
         run: async (unit) => {
@@ -368,7 +374,7 @@ export class PageTranslationManager implements IPageTranslationManager {
             walkId,
             currentConfig,
             false,
-            createWorkPacer(),
+            this.slicePacer ?? createWorkPacer(),
             isWalkCurrent,
           )
         },
@@ -509,6 +515,7 @@ export class PageTranslationManager implements IPageTranslationManager {
     this.lazyDispatch?.stop()
     this.lazyDispatch = null
     this.dispatchConfig = null
+    this.slicePacer = null
     this.walkBlockedElementsCache = new WeakSet()
     this.refreshingTranslatedSources = new WeakSet()
     this.translatedSourceMutationVersions = new WeakMap()
