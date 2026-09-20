@@ -1071,10 +1071,37 @@ options:
       copyName: "$1 副本"
       builtInPrompts:
         default:
-          description: 适合日常内容的均衡、可靠翻译
+          description: 均衡、可靠,适合日常内容
         precisionRewrite:
-          name: 精翻重写
-          description: 翻译更地道，俚语化；略微增加 token 消耗
+          name: 润色改写
+          description: 更地道、更口语化,但 token 消耗略高
+        smart:
+          name: 智能选择(自动匹配风格)
+          description: 读取页面标题、描述与正文,自动套用合适的风格 —— 时事新闻、游戏社区、技术文档、学术论文、论坛社交、电商商品、文学小说或口语字幕
+        news:
+          name: 时事新闻
+          description: 报道语体,人名机构名用通行译法,数字与消息来源逐字对应
+        gaming:
+          name: 游戏社区
+          description: 玩家口吻,游戏内术语沿用官方本地化,数值机制照抄不解释
+        techDocs:
+          name: 技术文档
+          description: 代码与标识符原样保留,一个概念一个译名,说明文字用祈使句
+        academic:
+          name: 学术论文
+          description: 领域术语准确,保留原文的限定强度,公式与引注不动
+        social:
+          name: 论坛社交
+          description: 保留语气与幽默,网络梗按意图翻译,楼中楼关系不变
+        ecommerce:
+          name: 电商商品
+          description: 规格精确,宣传口径不放大不缩水,可扫读结构保留
+        fiction:
+          name: 文学小说
+          description: 保留叙述语气与节奏,对白像人说的,意象改写到能落地
+        spoken:
+          name: 口语字幕
+          description: 短句自然,可按语速读完,不加旁白式说明
       importSuccess: 导入成功
       import: 导入
       export: 导出

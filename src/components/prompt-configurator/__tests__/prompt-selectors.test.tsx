@@ -117,6 +117,19 @@ function createTranslateConfig(): Config["pageTranslation"] {
   return translate
 }
 
+/** The genre styles ship as built-ins, so the picker lists them between the two. */
+const STYLE_LABELS = [
+  "smart",
+  "news",
+  "gaming",
+  "techDocs",
+  "academic",
+  "social",
+  "ecommerce",
+  "fiction",
+  "spoken",
+].map((id) => `options.translation.personalizedPrompts.builtInPrompts.${id}.name`)
+
 describe("translation prompt selectors", () => {
   beforeEach(() => {
     testState.pageTranslation = createTranslateConfig()
@@ -134,6 +147,7 @@ describe("translation prompt selectors", () => {
     expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual([
       "Default",
       "Deep polish",
+      ...STYLE_LABELS,
       "Custom",
     ])
 
@@ -183,6 +197,7 @@ describe("translation prompt selectors", () => {
     expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual([
       "Default",
       "Deep polish",
+      ...STYLE_LABELS,
       "Custom",
     ])
   })

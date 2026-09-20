@@ -28,6 +28,8 @@ import {
   WEB_SUMMARY,
   WEB_TITLE,
 } from "../constants/prompt"
+import { TRANSLATE_STYLE_PROMPTS } from "../constants/translate-style-prompts"
+import { resolvePromptIdForRequest } from "../translate/style-router"
 
 const HTML_ATTRIBUTE_MARKER_SYSTEM_PROMPT = `## Protected HTML Marker Rules
 These mandatory rules override any conflicting instructions above:
@@ -70,12 +72,26 @@ export function getTranslatePromptFromConfig(
   const customPromptsConfig = translateConfig.customPromptsConfig
   const { patterns, promptId } = customPromptsConfig
 
-  const resolvedPromptId = promptId || DEFAULT_TRANSLATE_PROMPT_ID
+  // "Smart" is a request to choose a style, not a style: the decision is made
+  // here, before the prompt becomes the cache key, so the side that hashes and
+  // the side that translates agree by construction.
+  const requestedId = promptId || DEFAULT_TRANSLATE_PROMPT_ID
+  const resolvedPromptId = resolvePromptIdForRequest(
+    requestedId,
+    {
+      title: options?.context?.webTitle,
+      description: options?.context?.webDescription,
+      input,
+    },
+    DEFAULT_TRANSLATE_PROMPT_ID,
+  )
   const builtInPrompt = Object.hasOwn(BUILT_IN_PAGE_TRANSLATE_PROMPTS, resolvedPromptId)
     ? BUILT_IN_PAGE_TRANSLATE_PROMPTS[
         resolvedPromptId as keyof typeof BUILT_IN_PAGE_TRANSLATE_PROMPTS
       ]
-    : undefined
+    : Object.hasOwn(TRANSLATE_STYLE_PROMPTS, resolvedPromptId)
+      ? TRANSLATE_STYLE_PROMPTS[resolvedPromptId as keyof typeof TRANSLATE_STYLE_PROMPTS]
+      : undefined
   const customPrompt = patterns.find((pattern) => pattern.id === resolvedPromptId)
   const selectedPrompt =
     builtInPrompt ?? customPrompt ?? BUILT_IN_PAGE_TRANSLATE_PROMPTS[DEFAULT_TRANSLATE_PROMPT_ID]

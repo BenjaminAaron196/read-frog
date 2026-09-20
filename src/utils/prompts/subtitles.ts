@@ -15,6 +15,8 @@ import {
   SUBTITLE_WEB_TITLE,
   VIDEO_SUMMARY,
 } from "../constants/prompt"
+import { TRANSLATE_STYLE_PROMPTS } from "../constants/translate-style-prompts"
+import { resolvePromptIdForRequest } from "../translate/style-router"
 import { resolvePromptReplacementValue } from "./translate"
 
 export async function getSubtitlesTranslatePrompt(
@@ -26,12 +28,23 @@ export async function getSubtitlesTranslatePrompt(
   const customPromptsConfig = config.videoSubtitles.customPromptsConfig
   const { patterns, promptId } = customPromptsConfig
 
-  const resolvedPromptId = promptId || DEFAULT_TRANSLATE_PROMPT_ID
+  // "Smart" picks a style here too, from the video's own metadata and the cue.
+  const resolvedPromptId = resolvePromptIdForRequest(
+    promptId || DEFAULT_TRANSLATE_PROMPT_ID,
+    {
+      title: options?.context?.webTitle,
+      description: options?.context?.webDescription,
+      input,
+    },
+    DEFAULT_TRANSLATE_PROMPT_ID,
+  )
   const builtInPrompt = Object.hasOwn(BUILT_IN_SUBTITLE_TRANSLATE_PROMPTS, resolvedPromptId)
     ? BUILT_IN_SUBTITLE_TRANSLATE_PROMPTS[
         resolvedPromptId as keyof typeof BUILT_IN_SUBTITLE_TRANSLATE_PROMPTS
       ]
-    : undefined
+    : Object.hasOwn(TRANSLATE_STYLE_PROMPTS, resolvedPromptId)
+      ? TRANSLATE_STYLE_PROMPTS[resolvedPromptId as keyof typeof TRANSLATE_STYLE_PROMPTS]
+      : undefined
   const customPrompt = patterns.find((pattern) => pattern.id === resolvedPromptId)
   const selectedPrompt =
     builtInPrompt ??

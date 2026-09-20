@@ -1075,6 +1075,33 @@ options:
         precisionRewrite:
           name: Polished rewrite
           description: More idiomatic, colloquial translations; slightly higher token usage
+        smart:
+          name: Smart (pick a style automatically)
+          description: Reads the page's title, description and text and applies the style that fits - news, gaming, docs, papers, forums, shops, fiction or speech
+        news:
+          name: News & current affairs
+          description: Reportorial register, established renderings for names and titles, exact figures and attribution
+        gaming:
+          name: Gaming communities
+          description: Player register, in-game terms kept as the localisation has them, mechanics quoted exactly
+        techDocs:
+          name: Technical docs
+          description: Code and identifiers copied verbatim, one term per concept, imperative prose
+        academic:
+          name: Academic papers
+          description: Field terminology, hedges preserved, notation and citations untouched
+        social:
+          name: Social posts & forums
+          description: Voice and humour kept, internet idiom translated by intent, threads stay threads
+        ecommerce:
+          name: Shopping & product pages
+          description: Specifications exact, claims intact, scanning structure preserved
+        fiction:
+          name: Fiction & novels
+          description: Voice, rhythm and dialogue kept; imagery rewritten until it lands
+        spoken:
+          name: Spoken & subtitles
+          description: Short natural clauses, readable at speaking speed, no stage directions
       importSuccess: Import success
       import: Import
       export: Export
