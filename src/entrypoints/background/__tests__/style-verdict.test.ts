@@ -45,8 +45,26 @@ describe("classifyStyleVerdict", () => {
     generateText.mockResolvedValue("news")
     const url = "https://news.example/one"
 
-    expect(await classifyStyleVerdict({ url, title: "Reuters", description: null })).toBe("news")
-    expect(await classifyStyleVerdict({ url, title: "Reuters", description: null })).toBe("news")
+    expect(
+      await classifyStyleVerdict({
+        url,
+        title: "Reuters: ceasefire holds in the north",
+        description: null,
+      }),
+    ).toEqual({
+      styleId: "news",
+      status: "resolved",
+    })
+    expect(
+      await classifyStyleVerdict({
+        url,
+        title: "Reuters: ceasefire holds in the north",
+        description: null,
+      }),
+    ).toEqual({
+      styleId: "news",
+      status: "resolved",
+    })
 
     expect(generateText).toHaveBeenCalledTimes(1)
     expect(styleVerdictFor(url)).toBe("news")
@@ -55,15 +73,29 @@ describe("classifyStyleVerdict", () => {
   it("reads an answer that names no genre as the default", async () => {
     generateText.mockResolvedValue("default")
     const url = "https://plain.example/two"
-    expect(await classifyStyleVerdict({ url, title: "Home", description: null })).toBe(null)
+    expect(
+      await classifyStyleVerdict({ url, title: "A page about nothing", description: null }),
+    ).toEqual({ styleId: null, status: "none" })
     expect(styleVerdictFor(url)).toBe(null)
   })
 
   it("does not pin a page to the default when the model call fails", async () => {
     generateText.mockRejectedValue(new Error("network"))
     const url = "https://flaky.example/three"
-    expect(await classifyStyleVerdict({ url, title: "x", description: null })).toBe(null)
+    expect(
+      await classifyStyleVerdict({ url, title: "A page worth reading", description: null }),
+    ).toEqual({ styleId: null, status: "unavailable" })
     // Unknown, not settled: a later attempt may still classify this page.
+    expect(styleVerdictFor(url)).toBeUndefined()
+  })
+
+  it("treats a page that has not hydrated as unanswered, not as no genre", async () => {
+    const url = "https://www.reuters.com/world/middle-east/article-2026-09-19/"
+    expect(await classifyStyleVerdict({ url, title: "reuters.com", description: "" })).toEqual({
+      styleId: null,
+      status: "unavailable",
+    })
+    expect(generateText).not.toHaveBeenCalled()
     expect(styleVerdictFor(url)).toBeUndefined()
   })
 })

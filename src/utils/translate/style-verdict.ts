@@ -52,7 +52,10 @@ export async function ensureStyleVerdict(input: {
         description: input.description ?? null,
       })
       const styleId = answer?.styleId ?? null
-      verdicts.set(input.url, styleId)
+      // `unavailable` is not an answer about the page: remembering it would pin
+      // this context to the default prompt while the other side classifies it
+      // properly later, and the two would build different prompts.
+      if (answer?.status !== "unavailable") verdicts.set(input.url, styleId)
       return styleId
     } catch (error) {
       logger.warn("[TranslateStyle] Classification unavailable", error)

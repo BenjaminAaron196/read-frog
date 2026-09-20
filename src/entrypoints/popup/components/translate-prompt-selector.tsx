@@ -45,8 +45,13 @@ function useResolvedStyleLabel(
         description: null,
       }).catch(() => null)
       if (cancelled) return
-      const styleId = answer?.styleId ?? null
-      const style = items.find((item) => item.value === styleId)
+      // "Could not answer yet" is not "this page has no genre": the first is
+      // worth waiting for, the second is a verdict.
+      if (answer?.status === "unavailable" || !answer) {
+        setLabel(i18n.t("translatePrompt.smartPending"))
+        return
+      }
+      const style = items.find((item) => item.value === answer.styleId)
       setLabel(
         style
           ? i18n.t("translatePrompt.smart", [style.label])

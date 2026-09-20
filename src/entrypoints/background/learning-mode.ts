@@ -75,28 +75,34 @@ export async function ensureBundledDictionary(): Promise<void> {
  * script that hashes a paragraph and the background that translates it have to
  * build the same prompt, so they have to read the same answer.
  */
+export type StyleVerdictStatus = "resolved" | "none" | "unavailable"
+
 export async function classifyStyleVerdict(data: {
   url: string
   title: string | null
   description: string | null
-}): Promise<string | null> {
+}): Promise<{ styleId: string | null; status: StyleVerdictStatus }> {
   const known = styleVerdictFor(data.url)
-  if (known !== undefined) return known
+  if (known !== undefined) {
+    return { styleId: known, status: known === null ? "none" : "resolved" }
+  }
 
   const config = (await getLocalConfig()) ?? DEFAULT_CONFIG
   // Only the "smart" style asks a model anything: an explicit choice needs no
   // verdict, and classifying anyway would spend a request per page for nothing.
-  if (config.pageTranslation.customPromptsConfig.promptId !== SMART_TRANSLATE_PROMPT_ID) return null
+  if (config.pageTranslation.customPromptsConfig.promptId !== SMART_TRANSLATE_PROMPT_ID) {
+    return { styleId: null, status: "unavailable" }
+  }
   // A page that has not hydrated yet reports its host as the title. Asking then
   // earns a `default` that would be cached per URL and keep the page on the
   // default prompt for good, so the question is left for a later attempt.
-  if (!hasClassifiableMetadata(data)) return null
+  if (!hasClassifiableMetadata(data)) return { styleId: null, status: "unavailable" }
   const row = config.providersConfig.find(
     (candidate) => candidate.id === config.pageTranslation.providerId,
   )
   if (!row || !isLLMProviderConfig(row)) {
-    rememberStyleVerdict(data.url, null)
-    return null
+    // Nothing to ask: not an answer about the page, so nothing is remembered.
+    return { styleId: null, status: "unavailable" }
   }
 
   try {
@@ -108,18 +114,16 @@ export async function classifyStyleVerdict(data: {
     })
     const styleId = classifyStyleAnswer(answer)
     rememberStyleVerdict(data.url, styleId)
-    return styleId
+    return { styleId, status: styleId === null ? "none" : "resolved" }
   } catch (error) {
     logger.warn("[TranslateStyle] Classification failed", error)
     // Not cached: a failed call must not pin the page to the default prompt.
-    return null
+    return { styleId: null, status: "unavailable" }
   }
 }
 
 export function setupTranslateStyleHandlers(): void {
-  onMessage("translateStyleVerdict", async ({ data }) => ({
-    styleId: await classifyStyleVerdict(data),
-  }))
+  onMessage("translateStyleVerdict", async ({ data }) => classifyStyleVerdict(data))
 }
 
 export function setupLearningModeMessageHandlers(): void {

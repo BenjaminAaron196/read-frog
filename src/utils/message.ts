@@ -148,7 +148,16 @@ interface ProtocolMap {
     url: string
     title: string | null
     description: string | null
-  }) => Promise<{ styleId: string | null }>
+  }) => Promise<{
+    styleId: string | null
+    /**
+     * `resolved` names a style, `none` is the model saying this page has no
+     * genre, and `unavailable` means the question could not be answered yet (no
+     * provider configured, the call failed, the page has not hydrated). The last
+     * one must not be remembered as an answer.
+     */
+    status: "resolved" | "none" | "unavailable"
+  }>
 
   learningDictionaryClear: () => Promise<void>
   notionTestConnection: (data: { apiKey: string }) => Promise<NotionUserResult>
