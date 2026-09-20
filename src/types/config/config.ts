@@ -14,6 +14,7 @@ import {
 import { floatingButtonSchema } from "./floating-button"
 import { glossaryConfigSchema } from "./glossary"
 import { languageDetectionConfigSchema } from "./language-detection"
+import { learningModeConfigSchema } from "./learning-mode"
 import { providersConfigSchema } from "./provider"
 import {
   selectionToolbarBuiltInActionsSchema,
@@ -158,6 +159,7 @@ export const configSchema = z
     translationHub: translationHubSchema,
     glossary: glossaryConfigSchema,
     wordBook: wordBookConfigSchema,
+    learningMode: learningModeConfigSchema,
   })
   .superRefine((data, ctx) => {
     for (const featureKey of FEATURE_KEYS) {

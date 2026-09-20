@@ -177,6 +177,17 @@ export function FeaturesNav() {
 
           <SidebarMenuItem>
             <SidebarMenuButton
+              render={<Link to="/learning-mode" />}
+              isActive={pathname === "/learning-mode"}
+              tooltip={i18n.t("learningMode.panel.title")}
+            >
+              <Icon icon="tabler:school" />
+              <span>{i18n.t("learningMode.panel.title")}</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+
+          <SidebarMenuItem>
+            <SidebarMenuButton
               render={
                 <a
                   href={browser.runtime.getURL(TRANSLATION_HUB_PAGE_PATH)}

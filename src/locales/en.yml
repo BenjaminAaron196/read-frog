@@ -1441,6 +1441,107 @@ wordBook:
     sourceUrl: Source URL
     sourceTitle: Source title
     addedAt: Added at
+learningMode:
+  panel:
+    title: Learning mode
+    description: Mark the words that are hard for you while you read, and look one up without leaving the page.
+    enable: Mark hard words on pages
+    enableDescription: Words are judged against a dictionary you import below. Nothing about the pages you read leaves your browser.
+  tier:
+    nudge: Worth a look
+    hard: Harder
+    beyond: Beyond your level
+  card:
+    addToWordBook: Save to word book
+    savedToWordBookHint: Saved to your word book
+    iKnowThis: I know this
+    ignore: Ignore
+    example: In this sentence
+    senses: Senses
+    frequency: Frequency
+    noDefinition: No definition in the local dictionary
+  hint:
+    summary: "$1 words on this page"
+    hide: Hide for this page
+  profile:
+    title: Difficulty profile
+    description: One profile decides which words count as hard; the other two keep their settings until you switch back.
+    kind: Profile
+    kindExam: Exam syllabus
+    kindCefr: CEFR level
+    kindVocabSize: Vocabulary size
+    exam: Exam syllabus
+    examDescription: Words on this exam's syllabus are the ones marked.
+    cefrLevel: CEFR level
+    cefrDescription: Words above this band are marked; the band itself is treated as known.
+    vocabSize: Vocabulary size
+    vocabSizeDescription: Words outside the $1-$2 most frequent ones are marked.
+    vocabSizeError: "Enter a number between $1 and $2"
+  display:
+    title: Marks
+    description: How the marks look on the page.
+    showDensityHint: Show the word count at the top of the page
+    showDensityHintDescription: One line above the article saying how many words were marked here.
+    intensity: Mark strength
+    intensityDescription: Scales the colour of every mark; a lower value keeps a long article quiet.
+    underline: Underline
+    underlineDescription: Underlines marked words.
+    wash: Background
+    washDescription: Adds a light background behind marked words.
+  exclude:
+    title: Pages that stay unmarked
+    description: One URL pattern per line, same syntax as the site rules. A line Read Frog cannot match rejects the whole edit.
+    placeholder: |-
+      *.example.com
+      example.com/news/*
+  examTags:
+    zk: Zhongkao
+    gk: Gaokao
+    cet4: CET-4
+    cet6: CET-6
+    ky: Kaoyan
+    toefl: TOEFL
+    ielts: IELTS
+    gre: GRE
+  dictionary:
+    title: Dictionary
+    status:
+      title: Current dictionary
+      empty: No dictionary imported yet. Learning mode marks nothing until you import one.
+      variant: Variant
+      variantLite: Lite
+      variantFull: Full
+      version: Version
+      entries: Entries
+      size: Size
+      importedAt: Imported
+      source: Source
+    variant:
+      title: Variant
+      description: Switching between lite and full means importing that variant's file; an imported dictionary is never converted.
+    import:
+      title: Import from a local file
+      description: The dictionary artifact the build script writes — a .json file holding meta and entries.
+      action: Choose file
+      importing: Reading the file...
+      success: "Imported $1 entries ($2)"
+      invalidFile: That file is not a Read Frog dictionary artifact.
+      variantMismatch: "That file is the $1 variant. Pick $1 above, then import it again."
+      truncated: "The file declares $1 but is only $2, so it arrived incomplete."
+      entryCountMismatch: "The file declares $1 entries but carries $2, so it arrived incomplete."
+      invalidEntries: "Entry $1 has no usable lower-case headword, so Read Frog did not write this file."
+    clear:
+      title: Remove dictionary
+      description: Marks stop until another file is imported. The file itself is untouched.
+      action: Remove
+      clearing: Removing...
+      success: Dictionary removed
+      failed: Could not remove the dictionary
+      dialog:
+        title: Remove the dictionary?
+        description: The marks disappear from every page until another dictionary is imported.
+        confirm: Remove
+        cancel: Cancel
 action:
   copy: Copy
   copied: Copied

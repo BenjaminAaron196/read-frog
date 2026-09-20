@@ -1,5 +1,6 @@
 import type { ContentScriptContext } from "#imports"
 import type { Config } from "@/types/config/config"
+import { getLocalConfig } from "@/utils/config/storage"
 import { DEFAULT_CONFIG } from "@/utils/constants/config"
 import { detectPageLanguageLightweight } from "@/utils/content/page-language"
 import { ensurePresetStyles } from "@/utils/host/translate/ui/style-injector"
@@ -8,6 +9,11 @@ import { onMessage, sendMessage } from "@/utils/message"
 import { clearEffectiveSiteControlUrl } from "@/utils/site-control"
 import { areSamePageTranslationOrigin } from "@/utils/url"
 import { bindTranslationHubShortcutKey } from "./bind-translation-hub-shortcut"
+import {
+  startLearningMode,
+  watchLearningModeStorage,
+  type LearningModeRuntime,
+} from "./learning-mode"
 import { setupUrlChangeListener } from "./listen"
 import { mountHostToast } from "./mount-host-toast"
 import { bindTranslationModeShortcutKey } from "./translation-control/bind-translation-mode-shortcut"
@@ -59,6 +65,33 @@ export async function bootstrapHostContent(
   if (translationEnabled) {
     void manager.start()
   }
+
+  /**
+   * Learning mode is independent of page translation: it marks words for a
+   * reader who never turns translation on, and rebuilds itself whenever the
+   * dictionary or its settings change (the run is cheap to redo).
+   */
+  let learningRuntime: LearningModeRuntime | null = null
+  let learningRestartTimer: number | null = null
+
+  const startLearningModeFromStorage = async () => {
+    learningRuntime?.stop()
+    learningRuntime = null
+    const config = await getLocalConfig()
+    if (!config) return
+    learningRuntime = await startLearningMode(config)
+  }
+
+  void startLearningModeFromStorage()
+
+  const cleanupLearningModeStorageWatch = watchLearningModeStorage(() => {
+    // Storage fires per key (config saves touch several); one rebuild per burst.
+    if (learningRestartTimer !== null) window.clearTimeout(learningRestartTimer)
+    learningRestartTimer = window.setTimeout(() => {
+      learningRestartTimer = null
+      void startLearningModeFromStorage()
+    }, 300)
+  })
 
   const handleUrlChange = async (from: string, to: string) => {
     if (from !== to) {
@@ -126,6 +159,9 @@ export async function bootstrapHostContent(
   ctx.onInvalidated(() => {
     removeHostToast()
     cleanupUrlListener()
+    learningRuntime?.stop()
+    if (learningRestartTimer !== null) window.clearTimeout(learningRestartTimer)
+    cleanupLearningModeStorageWatch()
     teardownNodeTranslation()
     cleanupPageTranslationTriggers()
     cleanupTranslationShortcut()

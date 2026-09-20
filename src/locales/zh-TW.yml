@@ -1441,6 +1441,107 @@ wordBook:
     sourceUrl: 來源連結
     sourceTitle: 來源標題
     addedAt: 新增時間
+learningMode:
+  panel:
+    title: 學習模式
+    description: 閱讀時把對你來說難的字詞標出來，不用離開頁面就能查。
+    enable: 在網頁上標註生詞
+    enableDescription: 判定依據是下方匯入的詞庫，閱讀的內容不會離開你的瀏覽器。
+  tier:
+    nudge: 可留意
+    hard: 較難
+    beyond: 超綱
+  card:
+    addToWordBook: 加入生詞本
+    savedToWordBookHint: 已在生詞本中
+    iKnowThis: 我認識
+    ignore: 忽略
+    example: 本句
+    senses: 釋義
+    frequency: 詞頻
+    noDefinition: 本地詞典沒有這個詞條
+  hint:
+    summary: "本頁 $1 個生詞"
+    hide: 本頁不再顯示
+  profile:
+    title: 難度檔
+    description: 只用一個檔決定哪些詞算難；切回來之前，另外兩檔的設定保持不變。
+    kind: 判定檔
+    kindExam: 考試大綱
+    kindCefr: CEFR 等級
+    kindVocabSize: 詞彙量
+    exam: 考試大綱
+    examDescription: 標註該考試大綱內的詞。
+    cefrLevel: CEFR 等級
+    cefrDescription: 高於該等級的詞會被標註，等級本身視為已掌握。
+    vocabSize: 詞彙量
+    vocabSizeDescription: 標註最常見 $1-$2 詞之外的詞。
+    vocabSizeError: "請輸入 $1 到 $2 之間的數字"
+  display:
+    title: 標註樣式
+    description: 標註在頁面上怎麼顯示。
+    showDensityHint: 在頁首顯示生詞數
+    showDensityHintDescription: 正文開頭一行，說明本頁標出了多少個詞。
+    intensity: 標註強度
+    intensityDescription: 統一調整所有標註的顏色深淺；調低後長文裡更安靜。
+    underline: 底線
+    underlineDescription: 給標註的詞加底線。
+    wash: 底色
+    washDescription: 給標註的詞加淺底色。
+  exclude:
+    title: 不標註的頁面
+    description: 每行一個網址比對模式，語法與站點規則相同；有一行無法比對就會拒絕整次編輯。
+    placeholder: |-
+      *.example.com
+      example.com/news/*
+  examTags:
+    zk: 中考
+    gk: 高考
+    cet4: CET-4
+    cet6: CET-6
+    ky: 考研
+    toefl: 托福
+    ielts: 雅思
+    gre: GRE
+  dictionary:
+    title: 詞庫
+    status:
+      title: 目前詞庫
+      empty: 還沒有匯入詞庫。匯入之前，學習模式不會標註任何詞。
+      variant: 變體
+      variantLite: 輕量
+      variantFull: 完整
+      version: 版本
+      entries: 詞條
+      size: 大小
+      importedAt: 匯入時間
+      source: 來源
+    variant:
+      title: 變體
+      description: 在輕量與完整之間切換需要匯入對應變體的檔案；已匯入的詞庫不會被自動轉換。
+    import:
+      title: 從本機檔案匯入
+      description: 建置腳本產出的詞庫製品 —— 一個含 meta 與 entries 的 .json 檔案。
+      action: 選擇檔案
+      importing: 正在讀取檔案...
+      success: "已匯入 $1 條詞條（$2）"
+      invalidFile: 這不是 Read Frog 的詞庫檔案。
+      variantMismatch: "這個檔案是$1版。請把上面的變體切到$1再匯入。"
+      truncated: "檔案宣告有 $1，實際只有 $2，代表下載不完整。"
+      entryCountMismatch: "檔案宣告有 $1 條詞條，實際只有 $2 條，代表檔案不完整。"
+      invalidEntries: 第 $1 條沒有可用的（小寫）詞頭，這個檔案不是 Read Frog 寫出的。
+    clear:
+      title: 移除詞庫
+      description: 移除後到再次匯入之前不再標註，檔案本身不受影響。
+      action: 移除
+      clearing: 正在移除...
+      success: 詞庫已移除
+      failed: 移除詞庫失敗
+      dialog:
+        title: 移除詞庫？
+        description: 在再次匯入詞庫之前，所有頁面都不再顯示標註。
+        confirm: 移除
+        cancel: 取消
 action:
   copy: 複製
   copied: 已複製

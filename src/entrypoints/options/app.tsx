@@ -54,6 +54,9 @@ function AdvancedRedirect() {
 const WordBookPage = lazy(() =>
   import("./pages/word-book").then((module) => ({ default: module.WordBookPage })),
 )
+const LearningModePage = lazy(() =>
+  import("./pages/learning-mode").then((module) => ({ default: module.LearningModePage })),
+)
 const HelpAndCommunityPage = lazy(() =>
   import("./pages/help-and-community").then((module) => ({ default: module.HelpAndCommunityPage })),
 )
@@ -139,6 +142,7 @@ const ROUTE_COMPONENTS: Record<RoutePath, ComponentType> = {
   "/advanced": AdvancedRedirect,
   "/help-and-community": HelpAndCommunityPage,
   "/word-book": WordBookPage,
+  "/learning-mode": LearningModePage,
   "/advanced/glossary": GlossaryPage,
   "/advanced/glossary/:glossaryId": GlossaryEditorPage,
   "/preference/config-backup": ConfigBackupPage,

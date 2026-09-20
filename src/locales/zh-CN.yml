@@ -1441,6 +1441,107 @@ wordBook:
     sourceUrl: 来源链接
     sourceTitle: 来源标题
     addedAt: 添加时间
+learningMode:
+  panel:
+    title: 学习模式
+    description: 阅读时把对你来说难的词标出来，不用离开页面就能查。
+    enable: 在网页上标注生词
+    enableDescription: 判定依据是下方导入的词库，阅读的内容不会离开你的浏览器。
+  tier:
+    nudge: 可留意
+    hard: 较难
+    beyond: 超纲
+  card:
+    addToWordBook: 加入生词本
+    savedToWordBookHint: 已在生词本中
+    iKnowThis: 我认识
+    ignore: 忽略
+    example: 本句
+    senses: 释义
+    frequency: 词频
+    noDefinition: 本地词典没有这个词条
+  hint:
+    summary: "本页 $1 个生词"
+    hide: 本页不再显示
+  profile:
+    title: 难度档
+    description: 只用一个档决定哪些词算难；切回来之前，另外两档的设置保持不变。
+    kind: 判定档
+    kindExam: 考试大纲
+    kindCefr: CEFR 等级
+    kindVocabSize: 词汇量
+    exam: 考试大纲
+    examDescription: 标注该考试大纲内的词。
+    cefrLevel: CEFR 等级
+    cefrDescription: 高于该等级的词会被标注，等级本身视为已掌握。
+    vocabSize: 词汇量
+    vocabSizeDescription: 标注最常见 $1-$2 词之外的词。
+    vocabSizeError: "请输入 $1 到 $2 之间的数字"
+  display:
+    title: 标注样式
+    description: 标注在页面上怎么显示。
+    showDensityHint: 在页首显示生词数
+    showDensityHintDescription: 正文开头一行，说明本页标出了多少个词。
+    intensity: 标注强度
+    intensityDescription: 统一调整所有标注的颜色深浅；调低后长文里更安静。
+    underline: 下划线
+    underlineDescription: 给标注的词加下划线。
+    wash: 底色
+    washDescription: 给标注的词加浅底色。
+  exclude:
+    title: 不标注的页面
+    description: 每行一个网址匹配模式，语法与站点规则相同；有一行无法匹配就会拒绝整次编辑。
+    placeholder: |-
+      *.example.com
+      example.com/news/*
+  examTags:
+    zk: 中考
+    gk: 高考
+    cet4: CET-4
+    cet6: CET-6
+    ky: 考研
+    toefl: 托福
+    ielts: 雅思
+    gre: GRE
+  dictionary:
+    title: 词库
+    status:
+      title: 当前词库
+      empty: 还没有导入词库。导入之前，学习模式不会标注任何词。
+      variant: 变体
+      variantLite: 轻量
+      variantFull: 完整
+      version: 版本
+      entries: 词条
+      size: 大小
+      importedAt: 导入时间
+      source: 来源
+    variant:
+      title: 变体
+      description: 在轻量与完整之间切换需要导入对应变体的文件；已导入的词库不会被自动转换。
+    import:
+      title: 从本地文件导入
+      description: 构建脚本产出的词库制品 —— 一个含 meta 与 entries 的 .json 文件。
+      action: 选择文件
+      importing: 正在读取文件...
+      success: "已导入 $1 条词条（$2）"
+      invalidFile: 这不是 Read Frog 的词库文件。
+      variantMismatch: "这个文件是$1版。请把上面的变体切到$1再导入。"
+      truncated: "文件声明有 $1，实际只有 $2，说明下载不完整。"
+      entryCountMismatch: "文件声明有 $1 条词条，实际只有 $2 条，说明文件不完整。"
+      invalidEntries: 第 $1 条没有可用的（小写）词头，这个文件不是 Read Frog 写出的。
+    clear:
+      title: 移除词库
+      description: 移除后到再次导入之前不再标注，文件本身不受影响。
+      action: 移除
+      clearing: 正在移除...
+      success: 词库已移除
+      failed: 移除词库失败
+      dialog:
+        title: 移除词库？
+        description: 在再次导入词库之前，所有页面都不再显示标注。
+        confirm: 移除
+        cancel: 取消
 action:
   copy: 复制
   copied: 已复制

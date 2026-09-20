@@ -47,3 +47,7 @@ scripts/output/
 
 reference/
 .gstack/
+
+# Learning-mode dictionary: cached upstream downloads and the emitted artifacts
+scripts/learning-mode/.cache/
+/dist/learning-mode/

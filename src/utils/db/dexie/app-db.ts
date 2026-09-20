@@ -8,6 +8,7 @@ import BatchRequestRecord from "./tables/batch-request-record"
 import Glossary from "./tables/glossary"
 import GlossarySyncSnapshot from "./tables/glossary-sync-snapshot"
 import GlossaryTerm from "./tables/glossary-term"
+import LearningWordStateEntry from "./tables/learning-word-state"
 import TranslationCache from "./tables/translation-cache"
 import WordBookEntry from "./tables/word-book"
 
@@ -27,6 +28,8 @@ export default class AppDB extends Dexie {
   glossarySyncSnapshot!: EntityTable<GlossarySyncSnapshot, "id">
 
   wordBook!: EntityTable<WordBookEntry, "id">
+
+  learningWordState!: EntityTable<LearningWordStateEntry, "word">
 
   constructor() {
     super(`${upperCamelCase(APP_NAME)}DB`)
@@ -199,6 +202,51 @@ export default class AppDB extends Dexie {
         syncStatus,
         addedAt`,
     })
+    // v8 adds the learning mode's per-word verdicts. The content script reads
+    // the whole table once per page and keys it by word, so the primary key is
+    // the only index there is: `state` and `updatedAt` ride along as data.
+    // Dexie creates the store; every version must still restate the full store
+    // set, so the eight above are repeated verbatim.
+    this.version(8).stores({
+      translationCache: `
+        key,
+        translation,
+        createdAt`,
+      batchRequestRecord: `
+        key,
+        createdAt,
+        originalRequestCount,
+        provider,
+        model`,
+      articleSummaryCache: `
+        key,
+        createdAt`,
+      aiSegmentationCache: `
+        key,
+        createdAt`,
+      glossary: `
+        id,
+        enabled,
+        createdAt`,
+      glossaryTerm: `
+        id,
+        glossaryId,
+        &[glossaryId+targetLang+matchKey],
+        enabled,
+        updatedAt`,
+      // Two rows, under two fixed ids, each holding a whole glossary. Nothing
+      // queries them by anything but the id.
+      glossarySyncSnapshot: `
+        id`,
+      // `syncStatus` indexes the rows still owing a Notion write; `addedAt`
+      // orders the list the side panel renders, newest first.
+      wordBook: `
+        id,
+        syncStatus,
+        addedAt`,
+      learningWordState: `
+        word`,
+    })
     this.translationCache.mapToClass(TranslationCache)
     this.batchRequestRecord.mapToClass(BatchRequestRecord)
     this.articleSummaryCache.mapToClass(ArticleSummaryCache)
@@ -207,5 +255,6 @@ export default class AppDB extends Dexie {
     this.glossaryTerm.mapToClass(GlossaryTerm)
     this.glossarySyncSnapshot.mapToClass(GlossarySyncSnapshot)
     this.wordBook.mapToClass(WordBookEntry)
+    this.learningWordState.mapToClass(LearningWordStateEntry)
   }
 }

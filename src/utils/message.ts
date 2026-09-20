@@ -23,6 +23,11 @@ import type { GlossarySnapshot } from "@/utils/glossary/active-matcher"
 import type { MatchedTerm } from "@/utils/glossary/types"
 import type { HostedAiStatus } from "@/utils/hosted-ai/types"
 import type {
+  LearningDictionaryMeta,
+  LearningWordState,
+  LearningWordStateKind,
+} from "@/utils/learning-mode/types"
+import type {
   NotionDatabaseListResult,
   NotionDatabaseResult,
   NotionUserResult,
@@ -103,6 +108,25 @@ interface ProtocolMap {
   wordBookRemove: (data: { id: string }) => Promise<void>
   wordBookRetry: (data: { id: string }) => Promise<WordBookRecord | null>
   wordBookSyncPending: () => Promise<WordBookRecord[]>
+  // learning mode — the personal word state lives in the extension's IndexedDB,
+  // which a content script cannot open, so every read and write goes through the
+  // background. The dictionary is deliberately NOT here: it is a multi-megabyte
+  // artifact the content script reads straight out of extension storage, and
+  // routing it through the message bus would cost more than the parse it saves.
+  learningWordStateList: () => Promise<LearningWordState[]>
+  learningWordStateSet: (data: {
+    word: string
+    state: LearningWordStateKind
+    /**
+     * Lowercased forms of the same word. A "known"/"ignored" verdict is stamped
+     * onto all of them, so `perceive` and `perceived` cannot disagree with each
+     * other.
+     */
+    family?: string[]
+  }) => Promise<void>
+  learningWordStateClear: (data: { word: string }) => Promise<void>
+  learningDictionaryStatus: () => Promise<LearningDictionaryMeta | null>
+  learningDictionaryClear: () => Promise<void>
   notionTestConnection: (data: { apiKey: string }) => Promise<NotionUserResult>
   notionListDatabases: (data: { apiKey: string }) => Promise<NotionDatabaseListResult>
   notionGetDatabase: (data: { apiKey: string; databaseId: string }) => Promise<NotionDatabaseResult>

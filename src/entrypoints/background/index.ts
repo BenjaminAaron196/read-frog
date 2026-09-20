@@ -28,6 +28,7 @@ import { setupFeatureUsedEventHandlers } from "./feature-used-event"
 import { setupGlossaryMessageHandlers } from "./glossary"
 import { setupHostedAiStatusHandler } from "./hosted-ai-status"
 import { setupIframeInjection } from "./iframe-injection"
+import { setupLearningModeMessageHandlers } from "./learning-mode"
 import { setupLLMGenerateTextMessageHandlers } from "./llm-generate-text"
 import { initMockData } from "./mock-data"
 import { newUserGuide } from "./new-user-guide"
@@ -153,6 +154,7 @@ export default defineBackground({
     setupHostedAiStatusHandler()
     setupGlossaryMessageHandlers()
     setupWordBookMessageHandlers()
+    setupLearningModeMessageHandlers()
     setupNotebasePendingSaveProcessor(() => backgroundReady)
     setupEdgeTTSMessageHandlers()
     setupLLMGenerateTextMessageHandlers()
