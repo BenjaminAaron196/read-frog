@@ -4,6 +4,11 @@ import type { LearningWordState } from "@/utils/learning-mode/types"
 import type { WordCardAiResult } from "@/utils/learning-mode/word-card-schema"
 import type { WordBookRecord } from "@/utils/word-book/types"
 import { browser } from "#imports"
+import { CONFIG_STORAGE_KEY } from "@/utils/constants/config"
+import {
+  LEARNING_DICTIONARY_ENTRIES_KEY,
+  LEARNING_DICTIONARY_META_KEY,
+} from "@/utils/constants/learning-mode"
 import { LearningHighlighter, type MarkedOccurrence } from "@/utils/learning-mode/highlighter"
 import {
   createHoverIntent,
@@ -507,10 +512,25 @@ export async function startLearningMode(config: Config): Promise<LearningModeRun
 }
 
 /** Dictionary or settings changes rebuild the whole run; the page state is cheap to redo. */
+/**
+ * Restarts the learning mode when something it depends on changed.
+ *
+ * It used to restart on *any* `storage.local` write, and a translation writes
+ * storage constantly (config atoms, caches, the word book). Each restart re-reads
+ * the dictionary - tens of thousands of rows - and re-scans the page, so on a
+ * large article the two features fed each other: the reader translates, the
+ * learning mode restarts, the page freezes.
+ */
 export function watchLearningModeStorage(onChange: () => void): () => void {
+  const watched = new Set([
+    CONFIG_STORAGE_KEY,
+    LEARNING_DICTIONARY_META_KEY,
+    LEARNING_DICTIONARY_ENTRIES_KEY,
+  ])
+
   const listener = (changes: Record<string, unknown>, areaName: string) => {
     if (areaName !== "local") return
-    if (Object.keys(changes).length === 0) return
+    if (!Object.keys(changes).some((key) => watched.has(key))) return
     onChange()
   }
 
