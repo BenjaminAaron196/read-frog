@@ -12,6 +12,8 @@ import {
   resolvePageTranslationProvider,
 } from "@/utils/providers/provider-ref"
 import { resolveProviderRefForCapability } from "@/utils/providers/provider-registry"
+import { SMART_TRANSLATE_PROMPT_ID } from "@/utils/translate/style-router"
+import { ensureStyleVerdict } from "@/utils/translate/style-verdict"
 import { getLocalConfig } from "../../config/storage"
 import { shouldSkipAsTargetLanguage } from "./target-language-skip"
 import { prepareTranslationText } from "./text-preparation"
@@ -175,6 +177,17 @@ export async function translateTextForPage(
     true,
     "pageTranslation",
   )
+
+  // "Smart" needs the page's genre before the prompt - and with it the cache key -
+  // is built. The verdict is one model call per URL, cached by the background and
+  // remembered here, so the side that translates builds the same prompt.
+  if (config.pageTranslation.customPromptsConfig.promptId === SMART_TRANSLATE_PROMPT_ID) {
+    await ensureStyleVerdict({
+      url: location.href,
+      title: webPageContext?.webTitle,
+      description: webPageContext?.webDescription,
+    })
+  }
 
   return translateTextUsingPageConfig(config, text, {
     webPageContext,

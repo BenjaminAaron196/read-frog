@@ -1390,6 +1390,9 @@ translateService:
   translationProviders: 翻译服务
   configureAPI: 配置 API
 translatePrompt:
+  smart: "智能切换($1)"
+  smartPending: "智能切换(识别中…)"
+  smartNone: "智能切换(无匹配风格)"
   title: AI 翻译风格
   description: 选择在翻译时使用的 Prompt，可在选项页新增或修改自定义 Prompt
 languageLevel: 你的来源语言水平

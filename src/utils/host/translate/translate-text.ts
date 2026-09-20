@@ -92,6 +92,7 @@ function normalizeWebPagePromptContext(
   }
 
   return {
+    url: normalizePromptContextValue(webPageContext.url),
     webTitle: normalizePromptContextValue(webPageContext.webTitle),
     webDescription: normalizePromptContextValue(webPageContext.webDescription),
     webContent: normalizePromptContextValue(webPageContext.webContent),
@@ -414,6 +415,7 @@ export async function translateTextCore(options: TranslateTextOptions): Promise<
     hash,
     textFormat,
     preserveLineBreaks,
+    url: normalizedWebPageContext?.url,
     webTitle: normalizedWebPageContext?.webTitle,
     webDescription: normalizedWebPageContext?.webDescription,
     webContent: normalizedWebPageContext?.webContent,

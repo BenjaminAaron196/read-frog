@@ -6,6 +6,12 @@ export interface WebPageContext {
 }
 
 export interface WebPagePromptContext {
+  /**
+   * The page the context describes. The content script is the only side that can
+   * read it, and the genre classifier needs it - a path often names the genre
+   * when the title does not.
+   */
+  url?: string | null
   webTitle?: string | null
   webDescription?: string | null
   webContent?: string | null
@@ -15,6 +21,8 @@ export interface WebPagePromptContext {
 }
 
 export interface SubtitlePromptContext {
+  /** The video's URL, for the genre classifier. */
+  url?: string | null
   webTitle?: string | null
   webDescription?: string | null
   videoSummary?: string | null

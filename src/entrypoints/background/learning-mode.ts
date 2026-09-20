@@ -1,5 +1,8 @@
 import type { LearningWordState } from "@/utils/learning-mode/types"
 import { browser } from "#imports"
+import { isLLMProviderConfig } from "@/types/config/provider"
+import { getLocalConfig } from "@/utils/config/storage"
+import { DEFAULT_CONFIG } from "@/utils/constants/config"
 import { db } from "@/utils/db/dexie/db"
 import { Sha256Hex } from "@/utils/hash"
 import {
@@ -10,6 +13,16 @@ import { clearDictionary, readDictionaryMeta } from "@/utils/learning-mode/looku
 import { parseWordCardAiResult } from "@/utils/learning-mode/word-card-schema"
 import { logger } from "@/utils/logger"
 import { onMessage } from "@/utils/message"
+import {
+  STYLE_CLASSIFY_SYSTEM_PROMPT,
+  getStyleClassifyPrompt,
+} from "@/utils/prompts/translate-style"
+import { SMART_TRANSLATE_PROMPT_ID } from "@/utils/translate/style-router"
+import {
+  classifyStyleAnswer,
+  rememberStyleVerdict,
+  styleVerdictFor,
+} from "@/utils/translate/style-verdict"
 import { generateTextForProviderRef } from "./background-stream"
 
 /**
@@ -53,6 +66,57 @@ export async function ensureBundledDictionary(): Promise<void> {
  * there, so the background only has to report and clear it — a payload of tens
  * of thousands of entries has no business crossing the message bus.
  */
+/**
+ * The page-genre verdict behind the "smart" translation style.
+ *
+ * It lives here rather than in the content script because the model call needs
+ * the reader's provider and must happen once for the whole page: the content
+ * script that hashes a paragraph and the background that translates it have to
+ * build the same prompt, so they have to read the same answer.
+ */
+export async function classifyStyleVerdict(data: {
+  url: string
+  title: string | null
+  description: string | null
+}): Promise<string | null> {
+  const known = styleVerdictFor(data.url)
+  if (known !== undefined) return known
+
+  const config = (await getLocalConfig()) ?? DEFAULT_CONFIG
+  // Only the "smart" style asks a model anything: an explicit choice needs no
+  // verdict, and classifying anyway would spend a request per page for nothing.
+  if (config.pageTranslation.customPromptsConfig.promptId !== SMART_TRANSLATE_PROMPT_ID) return null
+  const row = config.providersConfig.find(
+    (candidate) => candidate.id === config.pageTranslation.providerId,
+  )
+  if (!row || !isLLMProviderConfig(row)) {
+    rememberStyleVerdict(data.url, null)
+    return null
+  }
+
+  try {
+    const answer = await generateTextForProviderRef({
+      providerRef: { kind: "local", config: row },
+      instructions: STYLE_CLASSIFY_SYSTEM_PROMPT,
+      prompt: getStyleClassifyPrompt(data),
+      maxRetries: 0,
+    })
+    const styleId = classifyStyleAnswer(answer)
+    rememberStyleVerdict(data.url, styleId)
+    return styleId
+  } catch (error) {
+    logger.warn("[TranslateStyle] Classification failed", error)
+    // Not cached: a failed call must not pin the page to the default prompt.
+    return null
+  }
+}
+
+export function setupTranslateStyleHandlers(): void {
+  onMessage("translateStyleVerdict", async ({ data }) => ({
+    styleId: await classifyStyleVerdict(data),
+  }))
+}
+
 export function setupLearningModeMessageHandlers(): void {
   onMessage("learningWordStateList", () => db.learningWordState.toArray())
 

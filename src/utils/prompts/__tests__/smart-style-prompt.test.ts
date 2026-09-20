@@ -4,6 +4,7 @@ vi.mock("@/utils/config/storage", () => ({
   getLocalConfig: vi.fn<() => Promise<null>>(async () => null),
 }))
 
+import { rememberStyleVerdict } from "@/utils/translate/style-verdict"
 import { getTranslatePromptFromConfig } from "../translate"
 
 const configWith = (promptId: string) =>
@@ -12,9 +13,12 @@ const configWith = (promptId: string) =>
   }) as never
 
 describe("smart style selection in the page prompt builder", () => {
-  it("builds the genre prompt the page names", () => {
+  it("builds the genre prompt the page's verdict names", () => {
+    // The verdict is the model's, taken once per URL by the background; the
+    // builder only reads it, which is what keeps both sides on one prompt.
+    rememberStyleVerdict("https://news.example/article", "news")
     const result = getTranslatePromptFromConfig(configWith("smart"), "cmn", "The report said", {
-      context: { webTitle: "Reuters: ceasefire holds", webDescription: "" },
+      context: { url: "https://news.example/article", webTitle: "Reuters: ceasefire holds" },
     })
 
     expect(result.systemPrompt).toContain("News Translator")
@@ -22,7 +26,7 @@ describe("smart style selection in the page prompt builder", () => {
 
   it("builds the default prompt when nothing names a genre", () => {
     const result = getTranslatePromptFromConfig(configWith("smart"), "cmn", "Hello there", {
-      context: { webTitle: "Home", webDescription: "" },
+      context: { url: "https://plain.example/", webTitle: "Home" },
     })
 
     expect(result.systemPrompt).not.toContain("News Translator")
@@ -31,7 +35,7 @@ describe("smart style selection in the page prompt builder", () => {
 
   it("passes an explicit style through untouched", () => {
     const result = getTranslatePromptFromConfig(configWith("gaming"), "cmn", "Patch notes", {
-      context: { webTitle: "Home", webDescription: "" },
+      context: { url: "https://plain.example/", webTitle: "Home" },
     })
 
     expect(result.systemPrompt).toContain("Games Community Translator")
@@ -52,8 +56,9 @@ describe("smart style selection in the page prompt builder", () => {
       },
     }
 
+    rememberStyleVerdict("https://news.example/other", "news")
     const result = getTranslatePromptFromConfig(config, "cmn", "The report said", {
-      context: { webTitle: "Reuters: ceasefire holds", webDescription: "" },
+      context: { url: "https://news.example/other", webTitle: "Reuters: ceasefire holds" },
     })
 
     // The repository's precedence is built-in, then custom, then default - a

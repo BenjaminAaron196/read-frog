@@ -140,6 +140,16 @@ interface ProtocolMap {
     prompt: string
   }) => Promise<WordCardAiResult | null>
 
+  /**
+   * The genre of a page, decided once per URL by the background's model call.
+   * Both the side that hashes and the side that translates read this answer.
+   */
+  translateStyleVerdict: (data: {
+    url: string
+    title: string | null
+    description: string | null
+  }) => Promise<{ styleId: string | null }>
+
   learningDictionaryClear: () => Promise<void>
   notionTestConnection: (data: { apiKey: string }) => Promise<NotionUserResult>
   notionListDatabases: (data: { apiKey: string }) => Promise<NotionDatabaseListResult>
@@ -163,6 +173,10 @@ interface ProtocolMap {
       // Source line breaks are semantic (newline-preserving container or typed
       // input); providers whose transport collapses "\n" must protect them.
       preserveLineBreaks?: boolean
+      // The page this request belongs to. The sender is the only side that can
+      // read it, and the genre classifier needs it: a path often names the genre
+      // when the title does not.
+      url?: string | null
       webTitle?: string | null
       webDescription?: string | null
       webContent?: string | null

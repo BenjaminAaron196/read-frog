@@ -79,9 +79,9 @@ export function getTranslatePromptFromConfig(
   const resolvedPromptId = resolvePromptIdForRequest(
     requestedId,
     {
+      url: options?.context?.url,
       title: options?.context?.webTitle,
       description: options?.context?.webDescription,
-      input,
     },
     DEFAULT_TRANSLATE_PROMPT_ID,
   )

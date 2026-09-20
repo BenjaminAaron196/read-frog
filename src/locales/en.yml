@@ -1390,6 +1390,9 @@ translateService:
   translationProviders: Translation Providers
   configureAPI: Configure API
 translatePrompt:
+  smart: "Smart ($1)"
+  smartPending: "Smart (recognising…)"
+  smartNone: "Smart (no style)"
   title: AI Translation Style
   description: Select a Prompt to use during translation. Add or modify custom Prompts on the options page.
 languageLevel: Your Source Lang Level

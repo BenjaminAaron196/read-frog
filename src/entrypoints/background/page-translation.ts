@@ -21,6 +21,7 @@ import { onMessage } from "@/utils/message"
 import { getTranslatePrompt } from "@/utils/prompts/translate"
 import { canProviderRefGenerateText } from "@/utils/providers/provider-ref"
 import { TranslationCancelledError } from "@/utils/request/cancellation"
+import { classifyStyleVerdict } from "./learning-mode"
 import { getOrGenerateTranslationContextSummary } from "./translation-context-summary"
 import {
   buildTranslationScopeKey,
@@ -67,6 +68,7 @@ export function setupPageTranslationHandlers(): void {
         hash,
         textFormat,
         preserveLineBreaks,
+        url,
         webTitle,
         webDescription,
         webContent,
@@ -102,6 +104,16 @@ export function setupPageTranslationHandlers(): void {
     // side swallows this error).
     if (scope && cancelledScopes.has(scope)) {
       throw new TranslationCancelledError(scope)
+    }
+
+    // The content script asked for a verdict before hashing; this side asks for
+    // the same one before building its prompt, so both build the same string.
+    if (url) {
+      await classifyStyleVerdict({
+        url,
+        title: normalizePromptContextValue(webTitle) ?? null,
+        description: normalizePromptContextValue(webDescription) ?? null,
+      })
     }
 
     let result: string

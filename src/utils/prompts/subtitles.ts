@@ -32,9 +32,9 @@ export async function getSubtitlesTranslatePrompt(
   const resolvedPromptId = resolvePromptIdForRequest(
     promptId || DEFAULT_TRANSLATE_PROMPT_ID,
     {
+      url: options?.context?.url,
       title: options?.context?.webTitle,
       description: options?.context?.webDescription,
-      input,
     },
     DEFAULT_TRANSLATE_PROMPT_ID,
   )
