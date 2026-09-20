@@ -16,5 +16,6 @@ rhythm and dialogue for fiction, readable-at-speaking-speed clauses for speech.
 Smart reads the page's title, description and the passage itself and applies the
 style they name, staying on the default prompt when nothing does. The decision is
 taken inside the prompt builder, before the prompt becomes the translation cache
-key, so the side that hashes and the side that translates always agree; a custom
-prompt with a style's id still overrides that style.
+key, so the side that hashes and the side that translates always agree; an explicit
+style choice bypasses the classification, and a reader who wants their own
+version of a style gives their prompt a different id and selects it.
