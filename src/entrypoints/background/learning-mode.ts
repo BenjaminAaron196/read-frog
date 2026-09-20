@@ -1,10 +1,48 @@
 import type { LearningWordState } from "@/utils/learning-mode/types"
+import { browser } from "#imports"
 import { db } from "@/utils/db/dexie/db"
 import { Sha256Hex } from "@/utils/hash"
+import {
+  importDictionaryPayload,
+  parseDictionaryArtifact,
+} from "@/utils/learning-mode/dictionary-download"
 import { clearDictionary, readDictionaryMeta } from "@/utils/learning-mode/lookup"
 import { parseWordCardAiResult } from "@/utils/learning-mode/word-card-schema"
+import { logger } from "@/utils/logger"
 import { onMessage } from "@/utils/message"
 import { generateTextForProviderRef } from "./background-stream"
+
+/**
+ * The dictionary the build ships, adopted as the reader's own the first time the
+ * background starts without one.
+ *
+ * Without this the feature looks broken on a fresh install: the marks need a
+ * dictionary, and the options page offers a download source the reader has to
+ * host and a file they have to build. A reader who imports or downloads their own
+ * copy keeps it - this only fills the empty slot.
+ */
+/** Where the build places the shipped dictionary inside the extension package. */
+const BUNDLED_DICTIONARY_PATH = "learning-mode/dictionary-lite.json"
+
+export async function ensureBundledDictionary(): Promise<void> {
+  if (await readDictionaryMeta()) return
+
+  // Resolved against the extension root: the artifact arrives through the build's
+  // public-assets hook, so it is not one of the paths the generated URL types know.
+  const url = new URL(BUNDLED_DICTIONARY_PATH, browser.runtime.getURL("/")).href
+  const response = await fetch(url)
+  if (!response.ok) return
+
+  const blob = await response.blob()
+  const payload = parseDictionaryArtifact(await blob.text(), {
+    variant: "lite",
+    source: "bundled",
+    bytes: blob.size,
+    countedBy: "picker",
+  })
+  const meta = await importDictionaryPayload(payload)
+  logger.info("[LearningMode] Adopted the bundled dictionary", { entries: meta.entries })
+}
 
 /**
  * Everything the learning mode keeps outside the page.

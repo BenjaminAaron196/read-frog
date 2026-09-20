@@ -20,7 +20,6 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/base-ui/alert-dialog"
 import { Button } from "@/components/ui/base-ui/button"
-import { Label } from "@/components/ui/base-ui/label"
 import { Progress, ProgressLabel } from "@/components/ui/base-ui/progress"
 import {
   Select,
@@ -234,6 +233,13 @@ export function DictionarySection() {
   const [downloadOutcome, setDownloadOutcome] = useState<DownloadOutcome | null>(null)
 
   const abortRef = useRef<AbortController | null>(null)
+  /**
+   * The file input is driven from the button's click handler rather than by a
+   * `<label for>` inside it: a label nested in a button is not activated (the
+   * click never reaches the input, and the picker silently does not open), which
+   * is what made "Choose file" look dead.
+   */
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
     return () => abortRef.current?.abort()
@@ -561,17 +567,21 @@ export function DictionarySection() {
         title={i18n.t("learningMode.dictionary.import.title")}
         description={i18n.t("learningMode.dictionary.import.description")}
       >
-        <Button variant="outline" size="sm" className="p-0" disabled={isImporting}>
-          {/* The label fills the button so the whole control opens the picker. */}
-          <Label htmlFor={IMPORT_INPUT_ID} className="w-full gap-1 px-2.5 text-[length:inherit]">
-            <Icon icon="tabler:file-import" />
-            {isImporting
-              ? i18n.t("learningMode.dictionary.import.importing")
-              : i18n.t("learningMode.dictionary.import.action")}
-          </Label>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={isImporting}
+          onClick={() => fileInputRef.current?.click()}
+        >
+          <Icon icon="tabler:file-import" />
+          {isImporting
+            ? i18n.t("learningMode.dictionary.import.importing")
+            : i18n.t("learningMode.dictionary.import.action")}
         </Button>
         <input
           id={IMPORT_INPUT_ID}
+          ref={fileInputRef}
+          aria-label={i18n.t("learningMode.dictionary.import.action")}
           type="file"
           accept=".json,application/json"
           className="hidden"

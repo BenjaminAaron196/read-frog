@@ -28,7 +28,7 @@ import { setupFeatureUsedEventHandlers } from "./feature-used-event"
 import { setupGlossaryMessageHandlers } from "./glossary"
 import { setupHostedAiStatusHandler } from "./hosted-ai-status"
 import { setupIframeInjection } from "./iframe-injection"
-import { setupLearningModeMessageHandlers } from "./learning-mode"
+import { ensureBundledDictionary, setupLearningModeMessageHandlers } from "./learning-mode"
 import { setupLLMGenerateTextMessageHandlers } from "./llm-generate-text"
 import { initMockData } from "./mock-data"
 import { newUserGuide } from "./new-user-guide"
@@ -55,6 +55,11 @@ export default defineBackground({
       await ensureInstalledAtRecorded()
 
       await ensureInitializedConfig()
+
+      // Fills an empty dictionary slot; a reader who brought their own keeps it.
+      void ensureBundledDictionary().catch((error) => {
+        logger.warn("[Background] Bundled dictionary not adopted", error)
+      })
 
       // Open tutorial page when extension is installed
       if (details.reason === "install") {

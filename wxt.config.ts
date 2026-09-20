@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs"
 import path from "node:path"
 import process from "node:process"
 import ViteYaml from "@modyfi/vite-plugin-yaml"
@@ -19,6 +20,17 @@ const shouldSkipEnvValidation = process.env.WXT_SKIP_ENV_VALIDATION === "true"
 const monorepoRoot = process.env.WXT_MONOREPO_PATH
   ? path.resolve(process.env.WXT_MONOREPO_PATH)
   : path.resolve(__dirname, "../read-frog-monorepo")
+
+/**
+ * The learning mode's dictionary, as `scripts/learning-mode/build-dictionary.mjs`
+ * writes it. It is shipped inside the extension so the feature works without a
+ * download source or a file pick: the background adopts it on first start
+ * (`ensureBundledDictionary`), and an imported or downloaded dictionary replaces
+ * it. The artifact is a build output, not a source file - a checkout that has not
+ * run the builder simply ships without one.
+ */
+const BUNDLED_DICTIONARY_SRC = path.resolve(__dirname, "dist/learning-mode/dictionary-lite.json")
+const BUNDLED_DICTIONARY_DEST = "learning-mode/dictionary-lite.json"
 
 // See https://wxt.dev/api/config.html
 export default defineConfig({
@@ -94,6 +106,10 @@ export default defineConfig({
     excludeSources: ["docs/**/*", "assets/**/*", "repos/**/*", "readmes/**/*"],
   },
   hooks: {
+    "build:publicAssets": (_, files) => {
+      if (!existsSync(BUNDLED_DICTIONARY_SRC)) return
+      files.push({ absoluteSrc: BUNDLED_DICTIONARY_SRC, relativeDest: BUNDLED_DICTIONARY_DEST })
+    },
     "vite:build:extendConfig": (entrypoints, viteConfig) => {
       const entrypoint = entrypoints.length === 1 ? entrypoints[0] : undefined
       if (entrypoint?.type !== "content-script") return
