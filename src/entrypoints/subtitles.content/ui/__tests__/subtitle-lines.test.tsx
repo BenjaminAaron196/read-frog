@@ -10,6 +10,7 @@ import { MainSubtitle, TranslationSubtitle } from "../subtitle-lines"
 const mockedAtoms = vi.hoisted(() => ({
   languageAtom: null as any,
   videoSubtitlesAtom: null as any,
+  learningModeAtom: null as any,
 }))
 
 vi.mock("@/utils/i18n", () => ({
@@ -22,14 +23,18 @@ vi.mock("@/utils/atoms/config", async () => {
   const { atom } = await import("jotai")
   const languageAtom = atom(DEFAULT_CONFIG.language)
   const videoSubtitlesAtom = atom(DEFAULT_CONFIG.videoSubtitles)
+  // The main line carries the learning mode's marks, so it reads this field.
+  const learningModeAtom = atom(DEFAULT_CONFIG.learningMode)
 
   mockedAtoms.languageAtom = languageAtom
   mockedAtoms.videoSubtitlesAtom = videoSubtitlesAtom
+  mockedAtoms.learningModeAtom = learningModeAtom
 
   return {
     configFieldsAtomMap: {
       language: languageAtom,
       videoSubtitles: videoSubtitlesAtom,
+      learningMode: learningModeAtom,
     },
   }
 })

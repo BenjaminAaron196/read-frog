@@ -9,6 +9,7 @@ import { cn } from "@/utils/styles/utils"
 import { isTranslationPending } from "@/utils/subtitles/display-rules"
 import { displaySubtitleAtom } from "../atoms"
 import { SubtitlePendingLabel } from "./subtitle-pending-label"
+import { LearningSubtitleLine } from "./subtitles-learning"
 
 interface SubtitleLineProps {
   content?: string
@@ -35,13 +36,14 @@ export function MainSubtitle({ content, className }: SubtitleLineProps) {
   const { style } = useAtomValue(configFieldsAtomMap.videoSubtitles)
   const text = content ?? subtitle?.text ?? ""
 
+  // The learning mode's marks live inside this line, so the source row is the
+  // one that carries them: it is the text the reader is learning from.
   return (
-    <div
+    <LearningSubtitleLine
+      text={text}
       className={cn("subtitles-main text-xl leading-tight", className)}
       style={getTextStyleVars(style.main)}
-    >
-      {text}
-    </div>
+    />
   )
 }
 

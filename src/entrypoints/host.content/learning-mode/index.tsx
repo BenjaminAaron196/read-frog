@@ -4,8 +4,6 @@ import type { LearningWordState } from "@/utils/learning-mode/types"
 import type { WordCardAiResult } from "@/utils/learning-mode/word-card-schema"
 import type { WordBookRecord } from "@/utils/word-book/types"
 import { browser } from "#imports"
-import { isLLMProviderConfig } from "@/types/config/provider"
-import { getRandomUUID } from "@/utils/crypto-polyfill"
 import { LearningHighlighter, type MarkedOccurrence } from "@/utils/learning-mode/highlighter"
 import {
   createHoverIntent,
@@ -16,7 +14,6 @@ import {
 import {
   buildDictionaryIndex,
   collectSuppressedWords,
-  collectWordFamily,
   createWordMatcher,
   readDictionaryEntries,
   readDictionaryMeta,
@@ -27,9 +24,15 @@ import {
   removeLearningModeCss,
 } from "@/utils/learning-mode/styles"
 import { startViewportScanning } from "@/utils/learning-mode/viewport-scanner"
+import {
+  requestWordExplanation,
+  resolveWordCardAi,
+  saveWordToBook,
+  setWordState as setLearningWordState,
+  speakWord,
+} from "@/utils/learning-mode/word-card-actions"
 import { logger } from "@/utils/logger"
 import { sendMessage } from "@/utils/message"
-import { getWordInContextPrompt } from "@/utils/prompts/word-in-context"
 import { urlMatchesPattern } from "@/utils/url-pattern"
 import { createCardHost, type CardAnchor } from "./hosts"
 
@@ -55,12 +58,6 @@ function caretAtPoint(x: number, y: number): { node: Node; offset: number } | nu
     return { node: legacy.startContainer, offset: legacy.startOffset }
   }
   return null
-}
-
-function describeDefinition(data: WordCardData): string {
-  const chinese = data.entry.t?.slice(0, 3).join("; ")
-  if (chinese) return chinese
-  return data.entry.d?.slice(0, 2).join("; ") ?? ""
 }
 
 export interface LearningModeRuntime {
@@ -121,14 +118,8 @@ export async function startLearningMode(config: Config): Promise<LearningModeRun
    * LLM the reader already chose for prose, and a pure translate provider
    * (Google, DeepL) simply has no word cards.
    */
-  const aiProviderRow = config.providersConfig.find(
-    (row) => row.id === config.pageTranslation.providerId,
-  )
-  const aiProvider =
-    aiProviderRow && isLLMProviderConfig(aiProviderRow)
-      ? { kind: "local" as const, config: aiProviderRow }
-      : null
-  const aiEnabled = learningConfig.ai.enabled && aiProvider !== null
+  const aiContext = resolveWordCardAi(config)
+  const aiEnabled = learningConfig.ai.enabled && aiContext.enabled
   /**
    * One answer per word per page, replayed to the card on every later hover.
    * Requesting it again would be a wasted round trip, and not showing it would
@@ -161,35 +152,11 @@ export async function startLearningMode(config: Config): Promise<LearningModeRun
   }
 
   const speak = async (data: WordCardData) => {
-    // The reader's TTS settings are for whole passages; a word wants the English
-    // voice specifically, so a Chinese-configured default does not mispronounce it.
-    const voice = config.tts.languageVoices.eng ?? config.tts.defaultVoice
-    const signed = (value: number, unit: "%" | "Hz") => `${value >= 0 ? "+" : ""}${value}${unit}`
-    const result = await sendMessage("edgeTtsSynthesize", {
-      text: data.surface,
-      voice,
-      rate: signed(config.tts.rate, "%"),
-      pitch: signed(config.tts.pitch, "Hz"),
-      volume: signed(config.tts.volume, "%"),
-    }).catch(() => null)
-    if (!result?.ok) return
-
-    await sendMessage("ttsPlaybackPrepare", undefined).catch(() => undefined)
-    await sendMessage("ttsPlaybackStart", {
-      requestId: getRandomUUID(),
-      audioBase64: result.audioBase64,
-      contentType: result.contentType,
-    }).catch(() => undefined)
+    await speakWord(data, config)
   }
 
   const saveToWordBook = async (data: WordCardData) => {
-    await sendMessage("wordBookAdd", {
-      word: data.entry.w,
-      definition: describeDefinition(data),
-      context: data.sentence,
-      sourceUrl: window.location.href,
-      sourceTitle: document.title,
-    }).catch((error) => logger.warn("[LearningMode] Saving the word failed", error))
+    await saveWordToBook(data, { url: window.location.href, title: document.title })
 
     savedWords.add(data.entry.w)
     highlighter.setSavedWords(savedWords)
@@ -202,13 +169,8 @@ export async function startLearningMode(config: Config): Promise<LearningModeRun
     state: "known" | "ignored",
     occurrence: MarkedOccurrence,
   ) => {
-    const family = collectWordFamily(data.entry)
+    const family = await setLearningWordState(data, state)
     for (const form of family) suppressed.add(form)
-    await sendMessage("learningWordStateSet", {
-      word: data.entry.w,
-      state,
-      family,
-    }).catch((error) => logger.warn("[LearningMode] Saving the word state failed", error))
     removeMarks(occurrence)
   }
 
@@ -229,7 +191,7 @@ export async function startLearningMode(config: Config): Promise<LearningModeRun
       card.setAi({ status: "ready", result: aiResults.get(word) ?? null })
       return
     }
-    if (!aiEnabled || aiProvider === null) return
+    if (!aiEnabled || aiContext.provider === null) return
     if (aiBudget <= 0) return
     if (!data.sentence) return
 
@@ -240,26 +202,14 @@ export async function startLearningMode(config: Config): Promise<LearningModeRun
       aiTimer = null
       if (stopped || hoveredWord !== word) return
 
-      const prompt = getWordInContextPrompt({
-        word: data.entry.w,
-        sentence: data.sentence,
-        pageTitle: document.title,
-        sourceLang: config.language.sourceCode === "auto" ? "eng" : config.language.sourceCode,
-        targetLang: config.language.targetCode,
-        langLevel: config.language.level,
-      })
-
       card.setAi({ status: "loading" })
 
       void (async () => {
         try {
-          const result = await sendMessage("learningWordExplain", {
-            word: data.entry.w,
-            sentence: data.sentence,
-            providerRef: aiProvider,
-            instructions: prompt.systemPrompt,
-            prompt: prompt.prompt,
-          })
+          const result = await requestWordExplanation(
+            { word: data.entry.w, sentence: data.sentence, config, pageTitle: document.title },
+            aiContext,
+          )
           aiResults.set(word, result)
           if (stopped || hoveredWord !== word) return
           card.setAi({ status: "ready", result })

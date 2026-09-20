@@ -9,6 +9,9 @@ import type { LearningDisplayConfig } from "@/types/config/learning-mode"
  */
 export const LEARNING_MODE_STYLE_ID = "read-frog-learning-mode-styles"
 
+/** The class the subtitle renderer puts on a marked word (see `subtitle-text.ts`). */
+export const SUBTITLE_WORD_CLASS = "rf-subtitle-word"
+
 /** Alpha values are expressed against these base hues in both schemes. */
 const HUE_TIER1 = "99, 102, 241"
 const HUE_TIER2 = "217, 119, 6"
@@ -48,6 +51,39 @@ function tierRule({
     : "background-color: transparent;"
 
   return `::highlight(${name}) { ${decoration} ${background} text-underline-offset: 0.18em; }`
+}
+
+const TIER_HUES: {
+  tier: string
+  hue: string
+  underlineStyle: "dotted" | "solid"
+  thickness: number
+  washAlpha: number
+}[] = [
+  { tier: "tier1", hue: HUE_TIER1, underlineStyle: "dotted", thickness: 1.5, washAlpha: 0 },
+  { tier: "tier2", hue: HUE_TIER2, underlineStyle: "solid", thickness: 1.5, washAlpha: 0.12 },
+  { tier: "tier3", hue: HUE_TIER3, underlineStyle: "solid", thickness: 2, washAlpha: 0.16 },
+]
+
+/**
+ * The same ramp as the page marks, for the subtitle renderer.
+ *
+ * The page's rules are `::highlight()` pseudo-elements, which cannot paint inside
+ * a shadow root; the subtitles are rendered by Read Frog inside one, so the marks
+ * there are real spans. Same hues, same shapes, one palette behind both.
+ */
+export function buildSubtitleMarkCss(display: LearningDisplayConfig): string {
+  const rules: string[] = []
+  for (const { tier, hue, underlineStyle, thickness, washAlpha } of TIER_HUES) {
+    const decoration = display.underline
+      ? `text-decoration: underline ${underlineStyle} ${alpha(hue, 0.9, display.intensity)}; text-decoration-thickness: ${thickness}px; text-underline-offset: 0.18em;`
+      : "text-decoration: none;"
+    const background = display.wash
+      ? `background-color: ${alpha(hue, washAlpha, display.intensity)};`
+      : "background-color: transparent;"
+    rules.push(`.${SUBTITLE_WORD_CLASS}[data-tier="${tier}"] { ${decoration} ${background} }`)
+  }
+  return rules.join("\n")
 }
 
 /**
