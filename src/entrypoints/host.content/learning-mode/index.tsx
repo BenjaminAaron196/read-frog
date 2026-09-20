@@ -1,11 +1,18 @@
 import type { WordCardData } from "./word-card"
 import type { Config } from "@/types/config/config"
 import type { LearningTier, LearningWordState } from "@/utils/learning-mode/types"
+import type { WordCardAiResult } from "@/utils/learning-mode/word-card-schema"
 import type { WordBookRecord } from "@/utils/word-book/types"
 import { browser } from "#imports"
 import { isLLMProviderConfig } from "@/types/config/provider"
 import { getRandomUUID } from "@/utils/crypto-polyfill"
 import { LearningHighlighter, type MarkedOccurrence } from "@/utils/learning-mode/highlighter"
+import {
+  createHoverIntent,
+  decideHover,
+  HOVER_SWITCH_DELAY_MS,
+  type HoverIntent,
+} from "@/utils/learning-mode/hover-intent"
 import {
   buildDictionaryIndex,
   collectSuppressedWords,
@@ -129,7 +136,12 @@ export async function startLearningMode(config: Config): Promise<LearningModeRun
       ? { kind: "local" as const, config: aiProviderRow }
       : null
   const aiEnabled = learningConfig.ai.enabled && aiProvider !== null
-  const aiTried = new Set<string>()
+  /**
+   * One answer per word per page, replayed to the card on every later hover.
+   * Requesting it again would be a wasted round trip, and not showing it would
+   * make the same word look like it lost its explanation.
+   */
+  const aiResults = new Map<string, WordCardAiResult | null>()
   let aiBudget = learningConfig.ai.maxRequestsPerPage
 
   applyLearningModeCss(buildLearningModeCss(learningConfig.display))
@@ -223,7 +235,9 @@ export async function startLearningMode(config: Config): Promise<LearningModeRun
   }
 
   let hovered: MarkedOccurrence | null = null
-  let hoveredData: WordCardData | null = null
+  /** Headword the open card describes; the AI reply is matched against it. */
+  let hoveredWord: string | null = null
+  let hoverIntent: HoverIntent = createHoverIntent()
   let aiTimer: number | null = null
 
   /**
@@ -232,18 +246,21 @@ export async function startLearningMode(config: Config): Promise<LearningModeRun
    * and the reply is dropped when the reader has moved on — the card always
    * describes the word under the pointer.
    */
-  const requestAi = (occurrence: MarkedOccurrence, data: WordCardData) => {
+  const requestAi = (word: string, data: WordCardData) => {
+    if (aiResults.has(word)) {
+      card.setAi({ status: "ready", result: aiResults.get(word) ?? null })
+      return
+    }
     if (!aiEnabled || aiProvider === null) return
-    if (aiBudget <= 0 || aiTried.has(data.entry.w)) return
+    if (aiBudget <= 0) return
     if (!data.sentence) return
 
-    aiTried.add(data.entry.w)
     aiBudget -= 1
 
     if (aiTimer !== null) window.clearTimeout(aiTimer)
     aiTimer = window.setTimeout(() => {
       aiTimer = null
-      if (stopped || hovered !== occurrence) return
+      if (stopped || hoveredWord !== word) return
 
       const prompt = getWordInContextPrompt({
         word: data.entry.w,
@@ -265,11 +282,12 @@ export async function startLearningMode(config: Config): Promise<LearningModeRun
             instructions: prompt.systemPrompt,
             prompt: prompt.prompt,
           })
-          if (stopped || hovered !== occurrence) return
+          aiResults.set(word, result)
+          if (stopped || hoveredWord !== word) return
           card.setAi({ status: "ready", result })
         } catch (error) {
           logger.warn("[LearningMode] Word card request failed", error)
-          if (stopped || hovered !== occurrence) return
+          if (stopped || hoveredWord !== word) return
           card.setAi({ status: "error" })
         }
       })()
@@ -290,7 +308,9 @@ export async function startLearningMode(config: Config): Promise<LearningModeRun
   })
 
   let lastPosition = { x: 0, y: 0 }
+  let lastPointer = { x: 0, y: 0 }
   let hideTimer: number | null = null
+  let candidateTimer: number | null = null
   let lastMoveAt = 0
 
   const cancelHide = () => {
@@ -300,52 +320,127 @@ export async function startLearningMode(config: Config): Promise<LearningModeRun
     }
   }
 
+  const hideCard = () => {
+    cancelHide()
+    highlighter.setHovered(null)
+    hovered = null
+    hoveredWord = null
+    hoverIntent = createHoverIntent()
+    if (candidateTimer !== null) {
+      window.clearTimeout(candidateTimer)
+      candidateTimer = null
+    }
+    card.hide()
+  }
+
   const scheduleHide = () => {
     cancelHide()
-    hideTimer = window.setTimeout(() => {
-      highlighter.setHovered(null)
-      hovered = null
-      hoveredData = null
-      card.hide()
-    }, CARD_HIDE_DELAY_MS)
+    hideTimer = window.setTimeout(hideCard, CARD_HIDE_DELAY_MS)
+  }
+
+  const openCard = (occurrence: MarkedOccurrence) => {
+    cancelHide()
+    const data = cardDataOf(occurrence)
+    const previousWord = hoveredWord
+    const wasOpen = card.isVisible()
+    hovered = occurrence
+    hoveredWord = data.entry.w
+    highlighter.setHovered(occurrence)
+
+    // A second copy of the *same* word keeps the card where the reader already
+    // found it - re-anchoring would make it jump between the copies. A different
+    // word follows the pointer, otherwise the new content would appear under the
+    // old word.
+    if (!wasOpen || previousWord !== data.entry.w) {
+      const rect = occurrence.range.getBoundingClientRect()
+      lastPosition = { x: rect.left, y: rect.bottom }
+    }
+    card.show(data, lastPosition, savedWords.has(data.entry.w))
+    requestAi(data.entry.w, data)
+  }
+
+  const isPointInsideCurrentRect = (x: number, y: number): boolean => {
+    if (!hovered) return false
+    try {
+      const rect = hovered.range.getBoundingClientRect()
+      const margin = 6
+      return (
+        x >= rect.left - margin &&
+        x <= rect.right + margin &&
+        y >= rect.top - margin &&
+        y <= rect.bottom + margin
+      )
+    } catch {
+      return false
+    }
+  }
+
+  /**
+   * One decision per pointer observation, fed through the intent machine
+   * (`utils/learning-mode/hover-intent.ts`): the caret is noisy at word edges and
+   * over the card, so the card only moves once a different word has clearly been
+   * under the pointer, and it never disappears while the pointer is on it.
+   */
+  const observePointer = (x: number, y: number) => {
+    const now = performance.now()
+    lastMoveAt = now
+    lastPointer = { x, y }
+
+    const overCard = card.isPointerOverPoint(x, y)
+    const caret = overCard ? null : caretAtPoint(x, y)
+    const occurrence = caret ? highlighter.hitTest(caret.node, caret.offset) : null
+
+    const decision = decideHover(hoverIntent, {
+      word: occurrence?.entry.w ?? null,
+      now,
+      isPointerOverCard: overCard,
+      isWithinOpenWordRect: isPointInsideCurrentRect(x, y),
+    })
+    hoverIntent = decision.intent
+
+    if (decision.action === "keep") {
+      cancelHide()
+      // A pointer that lands on a new word and then stops still has to switch:
+      // observations arrive only on movement, so the wait is finished by a timer
+      // that re-reads the caret where the pointer already is.
+      if (hoverIntent.candidateWord !== null) {
+        scheduleCandidateCheck(HOVER_SWITCH_DELAY_MS - (now - hoverIntent.candidateSince))
+      }
+      return
+    }
+    if (decision.action === "hide") {
+      scheduleHide()
+      return
+    }
+    if (occurrence) openCard(occurrence)
   }
 
   const handlePointerMove = (event: MouseEvent) => {
-    const now = performance.now()
-    if (now - lastMoveAt < HOVER_THROTTLE_MS) return
-    lastMoveAt = now
+    if (performance.now() - lastMoveAt < HOVER_THROTTLE_MS) return
+    observePointer(event.clientX, event.clientY)
+  }
 
-    const caret = caretAtPoint(event.clientX, event.clientY)
-    if (!caret) {
-      scheduleHide()
-      return
-    }
-
-    const occurrence = highlighter.hitTest(caret.node, caret.offset)
-    if (!occurrence) {
-      scheduleHide()
-      return
-    }
-
-    cancelHide()
-    if (occurrence === hovered) return
-
-    hovered = occurrence
-    hoveredData = cardDataOf(occurrence)
-    highlighter.setHovered(occurrence)
-    const rect = occurrence.range.getBoundingClientRect()
-    lastPosition = { x: rect.left, y: rect.bottom }
-    card.show(hoveredData, lastPosition, savedWords.has(hoveredData.entry.w))
-    requestAi(occurrence, hoveredData)
+  const scheduleCandidateCheck = (delayMs: number) => {
+    if (candidateTimer !== null) window.clearTimeout(candidateTimer)
+    candidateTimer = window.setTimeout(
+      () => {
+        candidateTimer = null
+        if (stopped || hoverIntent.candidateWord === null) return
+        observePointer(lastPointer.x, lastPointer.y)
+      },
+      Math.max(20, delayMs),
+    )
   }
 
   const handlePointerLeave = (event: MouseEvent) => {
-    const target = event.relatedTarget
-    if (target instanceof Node && cardHostElement?.contains(target)) return
+    if (card.isPointerOver(event)) return
     scheduleHide()
   }
 
-  const cardHostElement = document.getElementById("read-frog-learning-card-host")
+  /** The card is anchored to a rect that moves with the page, so a scroll ends it. */
+  const handleScroll = () => {
+    if (hovered) hideCard()
+  }
 
   /**
    * Marks arrive as the reader approaches each block. The mutation and observer
@@ -362,15 +457,18 @@ export async function startLearningMode(config: Config): Promise<LearningModeRun
 
   window.addEventListener("mousemove", handlePointerMove, { passive: true })
   document.addEventListener("mouseleave", handlePointerLeave)
+  window.addEventListener("scroll", handleScroll, { passive: true, capture: true })
 
   const stop = () => {
     if (stopped) return
     stopped = true
     if (aiTimer !== null) window.clearTimeout(aiTimer)
+    if (candidateTimer !== null) window.clearTimeout(candidateTimer)
     scanner.stop()
     cancelHide()
     window.removeEventListener("mousemove", handlePointerMove)
     document.removeEventListener("mouseleave", handlePointerLeave)
+    window.removeEventListener("scroll", handleScroll, { capture: true })
     card.destroy()
     hint?.destroy()
     highlighter.reset()

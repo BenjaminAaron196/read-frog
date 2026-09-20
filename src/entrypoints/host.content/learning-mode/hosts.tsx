@@ -45,6 +45,12 @@ export interface CardHost {
   show(data: WordCardData, position: { x: number; y: number }, saved: boolean): void
   /** The AI half arrives after the local half, so it repaints the open card. */
   setAi(ai: WordCardAiState): void
+  /** True when the event came from inside the card (its own buttons included). */
+  isPointerOver(event: Event): boolean
+  /** Same question asked by position, for callers that have no event at hand. */
+  isPointerOverPoint(x: number, y: number): boolean
+  /** Whether a card is on screen right now. */
+  isVisible(): boolean
   hide(): void
   destroy(): void
 }
@@ -68,6 +74,22 @@ export function createCardHost(handlers: CardHandlers): CardHost {
 
   let current: { data: WordCardData; saved: boolean } | null = null
   let aiState: WordCardAiState = { status: "idle" }
+  /** Where the card belongs relative to the word it describes. */
+  let anchor: { x: number; y: number } | null = null
+
+  const place = () => {
+    if (!anchor) return
+    // Measured, not estimated: the card grows when the AI answer lands, and a
+    // guessed height would leave it sitting over the word (and the pointer).
+    const height = host.element.getBoundingClientRect().height
+    const fitsBelow = anchor.y + height + 12 <= window.innerHeight
+    const top = fitsBelow
+      ? anchor.y + 8
+      : Math.max(8, Math.min(anchor.y - height - 8, window.innerHeight - height - 8))
+    const left = Math.min(Math.max(8, anchor.x), Math.max(8, window.innerWidth - 344))
+    host.element.style.left = `${left}px`
+    host.element.style.top = `${top}px`
+  }
 
   const render = () => {
     if (!current) {
@@ -90,21 +112,21 @@ export function createCardHost(handlers: CardHandlers): CardHost {
         </div>
       </LocaleBoundary>,
     )
+    // The card's height is only known after React commits; the next frame then
+    // places it from that real height.
+    requestAnimationFrame(place)
   }
 
   return {
     show(data, position, saved) {
+      const isSameWord = current?.data.entry.w === data.entry.w
       current = { data, saved }
-      aiState = { status: "idle" }
-      // Flip above the mark when the card would run off the bottom of the viewport.
-      const estimatedHeight = 260
-      const top =
-        position.y + estimatedHeight > window.innerHeight
-          ? Math.max(8, position.y - estimatedHeight)
-          : position.y + 8
-      const left = Math.min(Math.max(8, position.x), window.innerWidth - 336)
-      host.element.style.left = `${left}px`
-      host.element.style.top = `${top}px`
+      // A different word re-anchors; the same word keeps the card where the
+      // reader already found it, so moving along one word cannot make it jump.
+      if (!isSameWord) {
+        aiState = { status: "idle" }
+        anchor = position
+      }
       render()
     },
     setAi(ai) {
@@ -112,9 +134,20 @@ export function createCardHost(handlers: CardHandlers): CardHost {
       if (!current) return
       render()
     },
+    isPointerOver(event) {
+      return event.composedPath().includes(host.element)
+    },
+    isPointerOverPoint(x, y) {
+      const hit = document.elementFromPoint(x, y)
+      return hit === host.element || (hit !== null && host.element.contains(hit))
+    },
+    isVisible() {
+      return current !== null
+    },
     hide() {
       if (!current) return
       current = null
+      anchor = null
       aiState = { status: "idle" }
       render()
     },
