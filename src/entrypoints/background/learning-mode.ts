@@ -16,6 +16,7 @@ import { onMessage } from "@/utils/message"
 import {
   STYLE_CLASSIFY_SYSTEM_PROMPT,
   getStyleClassifyPrompt,
+  hasClassifiableMetadata,
 } from "@/utils/prompts/translate-style"
 import { SMART_TRANSLATE_PROMPT_ID } from "@/utils/translate/style-router"
 import {
@@ -86,6 +87,10 @@ export async function classifyStyleVerdict(data: {
   // Only the "smart" style asks a model anything: an explicit choice needs no
   // verdict, and classifying anyway would spend a request per page for nothing.
   if (config.pageTranslation.customPromptsConfig.promptId !== SMART_TRANSLATE_PROMPT_ID) return null
+  // A page that has not hydrated yet reports its host as the title. Asking then
+  // earns a `default` that would be cached per URL and keep the page on the
+  // default prompt for good, so the question is left for a later attempt.
+  if (!hasClassifiableMetadata(data)) return null
   const row = config.providersConfig.find(
     (candidate) => candidate.id === config.pageTranslation.providerId,
   )

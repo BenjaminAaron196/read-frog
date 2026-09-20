@@ -45,6 +45,31 @@ export interface StyleClassifyInput {
   description?: string | null
 }
 
+/**
+ * Whether the page has told us enough to be classified.
+ *
+ * A page served before it hydrates reports its own host as the title
+ * ("reuters.com") and no description; asking the model then earns a correct
+ * `default` that, cached per URL, would keep the page on the default prompt for
+ * good. Such an answer is not an answer: the caller takes it as "not yet".
+ */
+export function hasClassifiableMetadata(input: StyleClassifyInput): boolean {
+  const title = input.title?.trim() ?? ""
+  const description = input.description?.trim() ?? ""
+
+  // A title that is the site's own host is the shell page's signature, however
+  // long the hostname happens to be.
+  try {
+    const host = new URL(input.url).hostname.replace(/^www\./, "").toLowerCase()
+    if (title.length > 0 && host.startsWith(title.toLowerCase())) return false
+  } catch {
+    // An unparsable URL is no reason to skip the call.
+  }
+
+  if (title.length >= 8) return true
+  return description.length >= 16
+}
+
 export function getStyleClassifyPrompt(input: StyleClassifyInput): string {
   return `URL: ${input.url}
 Title: ${input.title?.trim() || "(none)"}
