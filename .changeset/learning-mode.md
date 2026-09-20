@@ -13,8 +13,7 @@ it as known, or ignore it.
 
 The marks are CSS custom highlights, not elements: nothing is inserted into the
 page, so the site's own rendering, the page translation and React's
-reconciliation are untouched. A one-line chip at the start of the article gives
-the page's word count per tier.
+reconciliation are untouched.
 
 Difficulty comes from a downloaded dictionary (ECDICT with CEFR-J and Octanove
 bands): pick one profile - an exam (CET-4/6, 考研, TOEFL, IELTS, GRE), a CEFR

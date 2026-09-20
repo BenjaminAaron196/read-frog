@@ -1,6 +1,6 @@
 import type { WordCardData } from "./word-card"
 import type { Config } from "@/types/config/config"
-import type { LearningTier, LearningWordState } from "@/utils/learning-mode/types"
+import type { LearningWordState } from "@/utils/learning-mode/types"
 import type { WordCardAiResult } from "@/utils/learning-mode/word-card-schema"
 import type { WordBookRecord } from "@/utils/word-book/types"
 import { browser } from "#imports"
@@ -31,13 +31,7 @@ import { logger } from "@/utils/logger"
 import { sendMessage } from "@/utils/message"
 import { getWordInContextPrompt } from "@/utils/prompts/word-in-context"
 import { urlMatchesPattern } from "@/utils/url-pattern"
-import {
-  createCardHost,
-  createHintHost,
-  type CardAnchor,
-  type HintHost,
-  type HintCounts,
-} from "./hosts"
+import { createCardHost, type CardAnchor } from "./hosts"
 
 /** The pointer moves far more often than the hovered mark changes. */
 const HOVER_THROTTLE_MS = 60
@@ -50,14 +44,6 @@ const ANCHOR_WATCH_MS = 200
 /** Grace period so the card survives the pointer travelling from the word to it. */
 const CARD_HIDE_DELAY_MS = 220
 
-function countByTier(occurrences: readonly MarkedOccurrence[]): HintCounts {
-  const byTier: Record<LearningTier, number> = { tier1: 0, tier2: 0, tier3: 0 }
-  for (const occurrence of occurrences) {
-    byTier[occurrence.tier] += 1
-  }
-  return { total: occurrences.length, byTier }
-}
-
 /** Caret hit-testing across engines: Firefox exposes the standard API, Chromium the legacy one. */
 function caretAtPoint(x: number, y: number): { node: Node; offset: number } | null {
   const position = document.caretPositionFromPoint?.(x, y)
@@ -69,11 +55,6 @@ function caretAtPoint(x: number, y: number): { node: Node; offset: number } | nu
     return { node: legacy.startContainer, offset: legacy.startOffset }
   }
   return null
-}
-
-/** Where the density chip belongs: the page's own content root, when it has one. */
-function findContentAnchor(): Element | null {
-  return document.querySelector("article, main, #content, .content")
 }
 
 function describeDefinition(data: WordCardData): string {
@@ -170,27 +151,12 @@ export async function startLearningMode(config: Config): Promise<LearningModeRun
     sentence: occurrence.sentence,
   })
 
-  let hintHidden = !learningConfig.display.showDensityHint
-  let hint: HintHost | null = null
-  const refreshHint = () => {
-    if (hintHidden) return
-    if (!hint) {
-      hint = createHintHost(findContentAnchor(), () => {
-        hintHidden = true
-        hint?.destroy()
-        hint = null
-      })
-    }
-    hint.update(countByTier(highlighter.occurrencesSnapshot))
-  }
-
   const removeMarks = (occurrence: MarkedOccurrence) => {
     highlighter.flashKnown(occurrence)
     window.setTimeout(() => {
       highlighter.clearKnownFlash()
       highlighter.removeOccurrencesOf(occurrence.entry)
       highlighter.commit()
-      refreshHint()
     }, 320)
   }
 
@@ -522,7 +488,6 @@ export async function startLearningMode(config: Config): Promise<LearningModeRun
     highlighter,
     maxHighlights: learningConfig.maxHighlightsPerPage,
     shouldContinue,
-    onProgress: refreshHint,
   })
 
   window.addEventListener("mousemove", handlePointerMove, { passive: true })
@@ -541,7 +506,6 @@ export async function startLearningMode(config: Config): Promise<LearningModeRun
     document.removeEventListener("mouseleave", handlePointerLeave)
     window.removeEventListener("scroll", handleScroll, { capture: true })
     card.destroy()
-    hint?.destroy()
     highlighter.reset()
     removeLearningModeCss()
   }

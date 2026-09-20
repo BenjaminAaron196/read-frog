@@ -13,8 +13,7 @@ const MAX_INTENSITY = 1
 
 /**
  * How the marks look. Every control sits behind its own switch: a reader who
- * wants them quiet keeps the underline and drops the background, or turns the
- * count hint off and keeps the marks.
+ * wants them quiet keeps the underline and drops the background.
  */
 export function DisplaySection() {
   const [learningMode, setLearningMode] = useAtom(configFieldsAtomMap.learningMode)
@@ -30,17 +29,6 @@ export function DisplaySection() {
       title={i18n.t("learningMode.display.title")}
       contentClassName="gap-6"
     >
-      <ConfigItem
-        id="learning-mode-display-density-hint"
-        title={i18n.t("learningMode.display.showDensityHint")}
-        description={i18n.t("learningMode.display.showDensityHintDescription")}
-      >
-        <Switch
-          checked={display.showDensityHint}
-          onCheckedChange={(checked) => saveDisplay({ showDensityHint: checked })}
-        />
-      </ConfigItem>
-
       <ConfigItem
         id="learning-mode-display-intensity"
         title={i18n.t("learningMode.display.intensity")}

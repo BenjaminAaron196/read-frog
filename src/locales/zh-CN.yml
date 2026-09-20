@@ -1464,9 +1464,6 @@ learningMode:
     senses: 释义
     frequency: 词频
     noDefinition: 本地词典没有这个词条
-  hint:
-    summary: 本页 $1 个生词
-    hide: 本页不再显示
   profile:
     title: 难度档
     description: 只用一个档决定哪些词算难；切回来之前，另外两档的设置保持不变。
@@ -1483,8 +1480,6 @@ learningMode:
     vocabSizeError: 请输入 $1 到 $2 之间的数字
   display:
     title: 标注样式
-    showDensityHint: 在页首显示生词数
-    showDensityHintDescription: 正文开头一行，说明本页标出了多少个词。
     intensity: 标注强度
     intensityDescription: 统一调整所有标注的颜色深浅；调低后长文里更安静。
     underline: 下划线

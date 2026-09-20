@@ -10,7 +10,6 @@ export const learningProfileSchema = z.object({
 })
 
 export const learningDisplaySchema = z.object({
-  showDensityHint: z.boolean(),
   intensity: z.number().min(0.3).max(1),
   underline: z.boolean(),
   wash: z.boolean(),

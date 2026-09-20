@@ -1464,9 +1464,6 @@ learningMode:
     senses: 釋義
     frequency: 詞頻
     noDefinition: 本地詞典沒有這個詞條
-  hint:
-    summary: 本頁 $1 個生詞
-    hide: 本頁不再顯示
   profile:
     title: 難度檔
     description: 只用一個檔決定哪些詞算難；切回來之前，另外兩檔的設定保持不變。
@@ -1483,8 +1480,6 @@ learningMode:
     vocabSizeError: 請輸入 $1 到 $2 之間的數字
   display:
     title: 標註樣式
-    showDensityHint: 在頁首顯示生詞數
-    showDensityHintDescription: 正文開頭一行，說明本頁標出了多少個詞。
     intensity: 標註強度
     intensityDescription: 統一調整所有標註的顏色深淺；調低後長文裡更安靜。
     underline: 底線

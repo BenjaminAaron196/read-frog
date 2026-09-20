@@ -1,8 +1,6 @@
-import type { LearningTier } from "@/utils/learning-mode/types"
 import ReactDOM from "react-dom/client"
 import themeCSS from "@/assets/styles/theme.css?inline"
 import { NOTRANSLATE_CLASS, REACT_SHADOW_HOST_CLASS } from "@/utils/constants/dom-labels"
-import { i18n } from "@/utils/i18n"
 import { LocaleBoundary } from "@/utils/i18n/locale-boundary"
 import { ShadowHostBuilder } from "@/utils/react-shadow-host/shadow-host-builder"
 import { WordCard, type WordCardAiState, type WordCardData } from "./word-card"
@@ -273,75 +271,6 @@ export function createCardHost(handlers: CardHandlers): CardHost {
       host.root.unmount()
       host.cleanup()
       host.element.remove()
-    },
-  }
-}
-
-export interface HintCounts {
-  total: number
-  byTier: Record<LearningTier, number>
-}
-
-export interface HintHost {
-  update(counts: HintCounts): void
-  destroy(): void
-}
-
-/**
- * The page-density chip. It is inserted where the article starts rather than
- * pinned to the viewport: the count is article-level information, and a fixed
- * badge would sit over the page's own controls.
- */
-export function createHintHost(anchor: Element | null, onHide: () => void): HintHost {
-  const host = createHost("read-frog-learning-hint-host", "inline")
-  const wrapper = document.createElement("div")
-  wrapper.className = NOTRANSLATE_CLASS
-  wrapper.style.cssText = `margin: 8px 0 12px; z-index: ${HOST_Z_INDEX};`
-  wrapper.appendChild(host.element)
-
-  const target = anchor ?? document.body
-  target.insertAdjacentElement("afterbegin", wrapper)
-
-  return {
-    update(counts) {
-      host.root.render(
-        <LocaleBoundary>
-          <div className={NOTRANSLATE_CLASS}>
-            <div className="inline-flex items-center gap-2 rounded-full border bg-muted/60 px-3 py-1 text-xs text-muted-foreground">
-              <span>{i18n.t("learningMode.hint.summary", [String(counts.total)])}</span>
-              <span className="inline-flex items-center gap-1">
-                <span
-                  className="size-2 rounded-full bg-indigo-500/70"
-                  title={i18n.t("learningMode.tier.nudge")}
-                />
-                <span>{counts.byTier.tier1}</span>
-                <span
-                  className="size-2 rounded-full bg-amber-500/80"
-                  title={i18n.t("learningMode.tier.hard")}
-                />
-                <span>{counts.byTier.tier2}</span>
-                <span
-                  className="size-2 rounded-full bg-rose-500/80"
-                  title={i18n.t("learningMode.tier.beyond")}
-                />
-                <span>{counts.byTier.tier3}</span>
-              </span>
-              <button
-                type="button"
-                onClick={onHide}
-                className="rounded-md px-1 text-[11px] hover:bg-accent hover:text-foreground"
-              >
-                {i18n.t("learningMode.hint.hide")}
-              </button>
-            </div>
-          </div>
-        </LocaleBoundary>,
-      )
-    },
-    destroy() {
-      host.root.unmount()
-      host.cleanup()
-      wrapper.remove()
     },
   }
 }

@@ -1464,9 +1464,6 @@ learningMode:
     senses: Senses
     frequency: Frequency
     noDefinition: No definition in the local dictionary
-  hint:
-    summary: $1 words on this page
-    hide: Hide for this page
   profile:
     title: Difficulty profile
     description: One profile decides which words count as hard; the other two keep their settings until you switch back.
@@ -1483,8 +1480,6 @@ learningMode:
     vocabSizeError: Enter a number between $1 and $2
   display:
     title: Marks
-    showDensityHint: Show the word count at the top of the page
-    showDensityHintDescription: One line above the article saying how many words were marked here.
     intensity: Mark strength
     intensityDescription: Scales the colour of every mark; a lower value keeps a long article quiet.
     underline: Underline
