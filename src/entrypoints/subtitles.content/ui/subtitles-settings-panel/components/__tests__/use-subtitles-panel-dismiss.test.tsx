@@ -2,6 +2,7 @@
 import { cleanup, renderHook } from "@testing-library/react"
 import { createRef } from "react"
 import { afterEach, describe, expect, it, vi } from "vitest"
+import { REACT_SHADOW_HOST_CLASS } from "@/utils/constants/dom-labels"
 import { useSubtitlesPanelDismiss } from "../use-subtitles-panel-dismiss"
 
 function mount(onClose: () => void, panel: HTMLElement) {
@@ -46,16 +47,18 @@ describe("useSubtitlesPanelDismiss", () => {
     expect(onClose).not.toHaveBeenCalled()
   })
 
-  // The anchored toast portals out of the panel, so it reads as "outside".
-  // Dismissing here hides the toast's anchor mid-press, which turns the button
-  // the press was aimed at invisible before its click can land.
-  it("keeps the panel open for a press on the anchored toast", () => {
+  // Everything the panel portals - the anchored toast, selects, colour pickers,
+  // tooltips - leaves the panel's own subtree and lands in a shadow host of the
+  // extension's own. Dismissing there hides the toast's anchor mid-press, which
+  // turns the button the press was aimed at invisible before its click can land.
+  it("keeps the panel open for a press on a popup portalled out of it", () => {
     const panel = document.createElement("div")
-    const positioner = document.createElement("div")
-    positioner.dataset.slot = "toast-positioner"
+    const popupHost = document.createElement("div")
+    popupHost.classList.add(REACT_SHADOW_HOST_CLASS)
+    const popupRoot = popupHost.attachShadow({ mode: "open" })
     const action = document.createElement("button")
-    positioner.append(action)
-    document.body.append(panel, positioner)
+    popupRoot.append(action)
+    document.body.append(panel, popupHost)
     const onClose = vi.fn<() => void>()
     mount(onClose, panel)
 
