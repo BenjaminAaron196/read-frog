@@ -47,6 +47,25 @@ const ANCHOR_WATCH_MS = 200
 /** Grace period so the card survives the pointer travelling from the word to it. */
 const CARD_HIDE_DELAY_MS = 220
 
+/**
+ * Whether a point lands on Read Frog's own interface.
+ *
+ * The caret is a geometry query, and geometry does not know about
+ * `pointer-events`: with a panel of ours over the page it happily resolves the
+ * words *behind* it, which reads as the panel failing to cover them - and, when
+ * the caret then disagrees with the mark's box, it drags the geometric fallback
+ * (a scan over every mark, each one a forced layout) into every pointer move.
+ *
+ * `elementFromPoint` does respect `pointer-events`, so it is the honest answer to
+ * "whose pixels are these".
+ */
+function isPointerOverExtensionUi(x: number, y: number): boolean {
+  const hit = document.elementFromPoint(x, y)
+  if (hit === null) return false
+  if (hit.closest(".read-frog-react-shadow-host")) return true
+  return hit.id.startsWith("read-frog")
+}
+
 /** Caret hit-testing across engines: Firefox exposes the standard API, Chromium the legacy one. */
 function caretAtPoint(x: number, y: number): { node: Node; offset: number } | null {
   const position = document.caretPositionFromPoint?.(x, y)
@@ -374,8 +393,11 @@ export async function startLearningMode(config: Config): Promise<LearningModeRun
     lastPointer = { x, y }
 
     const overCard = card.isPointerOverPoint(x, y)
-    const caret = overCard ? null : caretAtPoint(x, y)
-    const occurrence = overCard ? null : resolveOccurrence(x, y, caret)
+    // Read Frog's own panels cover the page: the words behind them are not the
+    // reader's target, and hit-testing them costs a scan per pointer move.
+    const overOwnUi = !overCard && isPointerOverExtensionUi(x, y)
+    const caret = overCard || overOwnUi ? null : caretAtPoint(x, y)
+    const occurrence = overCard || overOwnUi ? null : resolveOccurrence(x, y, caret)
 
     const decision = decideHover(hoverIntent, {
       occurrenceId: occurrence?.id ?? null,

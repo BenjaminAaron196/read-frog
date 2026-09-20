@@ -164,15 +164,18 @@ export function useLearningSubtitleRuntime(): LearningSubtitleRuntime | null {
     if (enabled) void learningMarks.ensure(learning)
   }, [enabled, learning])
 
-  if (!enabled) return null
-  const marks = snapshot.marks
-  if (!marks) return null
+  const suppress = useCallback(
+    (words: readonly string[]) => learningMarks.suppress(learning, words),
+    [learning],
+  )
 
-  return {
-    mark: (text) => marks.mark(text),
-    styles: marks.styles,
-    suppress: (words) => learningMarks.suppress(learning, words),
-  }
+  // The object identity is what the lines' memos watch: rebuilt only when the
+  // published marks or the settings change, never on an unrelated render.
+  return useMemo(() => {
+    const marks = snapshot.marks
+    if (!enabled || !marks) return null
+    return { mark: (text: string) => marks.mark(text), styles: marks.styles, suppress }
+  }, [enabled, snapshot.marks, suppress])
 }
 
 function SubtitleWord({
