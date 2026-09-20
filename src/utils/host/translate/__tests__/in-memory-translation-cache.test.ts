@@ -52,7 +52,11 @@ async function setup() {
   return { sendMessage: vi.mocked(sendMessage), translate, sessionId, endPageTranslationSession }
 }
 
-describe("in-memory translation tier in translateTextCore", () => {
+// The first case pays the module graph's import (translate-text and everything it
+// pulls in) inside its own body, which on a cold transform under the full suite's
+// worker load runs past the default 5s budget. The budget is what is wrong here,
+// not the cache: the case asserts one background round trip for two calls.
+describe("in-memory translation tier in translateTextCore", { timeout: 30_000 }, () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
