@@ -81,6 +81,30 @@ describe("createWordMatcher", () => {
   })
 })
 
+describe("createWordMatcher quiet mode", () => {
+  const index = buildDictionaryIndex([
+    // One band above B1: the gentlest tier.
+    entry({ w: "perceive", frq: 3000, cefr: "B2" }),
+    // Two bands above: the middle tier.
+    entry({ w: "abstract", frq: 9000, cefr: "C1" }),
+  ])
+
+  it("drops the gentler tier when the reader asked for the harder words only", () => {
+    const loud = createWordMatcher({ index, profile: PROFILE, suppressedWords: new Set() })
+    expect(loud("perceive")?.tier).toBe("tier1")
+    expect(loud("abstract")?.tier).toBe("tier2")
+
+    const quiet = createWordMatcher({
+      index,
+      profile: PROFILE,
+      suppressedWords: new Set(),
+      minTier: "tier2",
+    })
+    expect(quiet("perceive")).toBe(null)
+    expect(quiet("abstract")?.tier).toBe("tier2")
+  })
+})
+
 describe("collectSuppressedWords", () => {
   it("keeps only the states that silence a word", () => {
     const states: LearningWordState[] = [
