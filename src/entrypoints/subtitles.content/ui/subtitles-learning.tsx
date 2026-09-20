@@ -1,10 +1,11 @@
 import type { CSSProperties, ReactNode } from "react"
-import type { WordMatcher } from "@/utils/learning-mode/lookup"
+import type { Config } from "@/types/config/config"
+import type { DictionaryIndex, WordMatcher } from "@/utils/learning-mode/lookup"
 import type { SubtitleToken } from "@/utils/learning-mode/subtitle-text"
 import type { LearningWordState } from "@/utils/learning-mode/types"
 import type { WordCardAiResult } from "@/utils/learning-mode/word-card-schema"
 import { useAtomValue } from "jotai"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react"
 import {
   WordCard,
   type WordCardAiState,
@@ -48,54 +49,130 @@ export interface LearningSubtitleRuntime {
 }
 
 /**
- * Builds the matcher once per runtime: reading the dictionary and the reader's
- * verdicts is a few hundred milliseconds of storage and parsing, and the answer
- * only changes when the dictionary or the profile does.
+ * One dictionary, one index, one matcher - for the whole document.
+ *
+ * The transcript renders a row per subtitle line, and every row marks its own
+ * text. Reading the dictionary (tens of thousands of rows, ten megabytes) and
+ * building the index per row is what froze the page: hundreds of rows, hundreds
+ * of copies of one dictionary, one main thread. The load is shared, and so is
+ * the answer.
+ *
+ * Everything the store owns is written from `ensure` (an effect) or `suppress`
+ * (an event handler); components only read the snapshot it publishes, which is
+ * what keeps this out of the render phase.
  */
-export function useLearningSubtitleRuntime(): LearningSubtitleRuntime | null {
-  const learning = useAtomValue(configFieldsAtomMap.learningMode)
-  const [runtime, setRuntime] = useState<LearningSubtitleRuntime | null>(null)
-  /** Words the reader silenced in this session; added to the stored verdicts. */
-  const [silenced, setSilenced] = useState<ReadonlySet<string>>(() => new Set())
+interface SharedLearningMarks {
+  mark(text: string): SubtitleToken[]
+  styles: string
+}
 
+interface MarksSnapshot {
+  marks: SharedLearningMarks | null
+}
+
+type LearningMarksConfig = {
+  profile: Config["learningMode"]["profile"]
+  display: Config["learningMode"]["display"]
+}
+
+function marksKey(learning: LearningMarksConfig): string {
+  return JSON.stringify([learning.profile, learning.display])
+}
+
+class LearningMarksStore {
+  private listeners = new Set<() => void>()
+  private snapshot: MarksSnapshot = { marks: null }
+  private key = ""
+  private index: DictionaryIndex | null = null
+  private states: readonly LearningWordState[] = []
+  private silenced = new Set<string>()
+  private loading: Promise<void> | null = null
+
+  subscribe = (listener: () => void): (() => void) => {
+    this.listeners.add(listener)
+    return () => this.listeners.delete(listener)
+  }
+
+  getSnapshot = (): MarksSnapshot => this.snapshot
+
+  /** Loads the dictionary once, then keeps the matcher in step with the settings. */
+  async ensure(learning: LearningMarksConfig): Promise<void> {
+    const key = marksKey(learning)
+    if (this.index === null) {
+      this.loading ??= (async () => {
+        try {
+          const [entries, states] = await Promise.all([
+            readDictionaryEntries(),
+            sendMessage("learningWordStateList", undefined).catch((): LearningWordState[] => []),
+          ])
+          if (entries.length === 0) return
+          this.index = buildDictionaryIndex(entries)
+          this.states = states
+        } catch (error) {
+          logger.warn("[LearningMode] Subtitle marks unavailable", error)
+        }
+      })().finally(() => {
+        this.loading = null
+      })
+      await this.loading
+    }
+    if (this.index === null || this.key === key) return
+    this.key = key
+    this.rebuild(learning)
+  }
+
+  /** Silences the forms the reader just marked as known or ignored. */
+  suppress(learning: LearningMarksConfig, words: readonly string[]): void {
+    let changed = false
+    for (const word of words) {
+      if (this.silenced.has(word)) continue
+      this.silenced.add(word)
+      changed = true
+    }
+    if (changed) this.rebuild(learning)
+  }
+
+  private rebuild(learning: LearningMarksConfig): void {
+    if (this.index === null) return
+    const matcher: WordMatcher = createWordMatcher({
+      index: this.index,
+      profile: learning.profile,
+      suppressedWords: new Set([...collectSuppressedWords(this.states), ...this.silenced]),
+    })
+    this.snapshot = {
+      marks: {
+        mark: (text) => markSubtitleText(text, matcher),
+        styles: buildSubtitleMarkCss(learning.display),
+      },
+    }
+    for (const listener of this.listeners) listener()
+  }
+}
+
+const learningMarks = new LearningMarksStore()
+
+export function useLearningSubtitleRuntime(): LearningSubtitleRuntime | null {
+  const learning = useAtomValue(configFieldsAtomMap.learningMode, { store: subtitlesStore })
+  const snapshot = useSyncExternalStore(
+    learningMarks.subscribe,
+    learningMarks.getSnapshot,
+    learningMarks.getSnapshot,
+  )
   const enabled = learning.enabled
 
   useEffect(() => {
-    if (!enabled) return undefined
+    if (enabled) void learningMarks.ensure(learning)
+  }, [enabled, learning])
 
-    let cancelled = false
-    void (async () => {
-      try {
-        const [entries, states] = await Promise.all([
-          readDictionaryEntries(),
-          sendMessage("learningWordStateList", undefined).catch((): LearningWordState[] => []),
-        ])
-        if (cancelled || entries.length === 0) return
+  if (!enabled) return null
+  const marks = snapshot.marks
+  if (!marks) return null
 
-        const index = buildDictionaryIndex(entries)
-        const matcher: WordMatcher = createWordMatcher({
-          index,
-          profile: learning.profile,
-          suppressedWords: new Set([...collectSuppressedWords(states), ...silenced]),
-        })
-        setRuntime({
-          mark: (text) => markSubtitleText(text, matcher),
-          styles: buildSubtitleMarkCss(learning.display),
-          suppress: (words) => setSilenced((previous) => new Set([...previous, ...words])),
-        })
-      } catch (error) {
-        logger.warn("[LearningMode] Subtitle marks unavailable", error)
-      }
-    })()
-
-    return () => {
-      cancelled = true
-    }
-  }, [enabled, learning.profile, learning.display, silenced])
-
-  // Derived rather than reset in the effect: switching the feature off must not
-  // leave the previously built matcher in place for a render.
-  return enabled ? runtime : null
+  return {
+    mark: (text) => marks.mark(text),
+    styles: marks.styles,
+    suppress: (words) => learningMarks.suppress(learning, words),
+  }
 }
 
 function SubtitleWord({
