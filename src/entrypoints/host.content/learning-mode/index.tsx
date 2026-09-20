@@ -388,14 +388,17 @@ export async function startLearningMode(config: Config): Promise<LearningModeRun
     y: number,
     caret: { node: Node; offset: number } | null,
   ): MarkedOccurrence | null => {
-    const fromCaret = caret ? highlighter.hitTest(caret.node, caret.offset) : null
+    const fromCaret = caret ? highlighter.hitTest(caret.node, caret.offset, { x, y }) : null
     if (fromCaret && containsPoint(fromCaret.range.getBoundingClientRect(), x, y)) {
       return fromCaret
     }
     if (!caret) return null
 
+    // Rationed: the walk is expensive, and an unverified answer is worse than
+    // none - it is what opened a card for the last word of a line while the
+    // pointer sat in the empty space beside it.
     const now = performance.now()
-    if (now - lastFallbackAt < FALLBACK_MIN_INTERVAL_MS) return fromCaret
+    if (now - lastFallbackAt < FALLBACK_MIN_INTERVAL_MS) return null
     lastFallbackAt = now
     return highlighter.hitTestPoint(x, y)
   }

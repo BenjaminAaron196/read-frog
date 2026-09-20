@@ -16,6 +16,20 @@ export interface MarkedOccurrence {
   sentence: string
 }
 
+/** Whether a point falls inside a box, with a little slack for rounding. */
+function containsPoint(
+  rect: { left: number; right: number; top: number; bottom: number },
+  point: { x: number; y: number },
+  margin = 4,
+): boolean {
+  return (
+    point.x >= rect.left - margin &&
+    point.x <= rect.right + margin &&
+    point.y >= rect.top - margin &&
+    point.y <= rect.bottom + margin
+  )
+}
+
 const TIER_HIGHLIGHT_NAME: Record<LearningTier, string> = {
   tier1: "rf-word-tier1",
   tier2: "rf-word-tier2",
@@ -194,7 +208,7 @@ export class LearningHighlighter {
    * half of a word resolves to the offset just after it, and readers aim at the
    * word, not at its leading pixel.
    */
-  hitTest(node: Node, offset: number): MarkedOccurrence | null {
+  hitTest(node: Node, offset: number, point?: { x: number; y: number }): MarkedOccurrence | null {
     if (node.nodeType !== Node.TEXT_NODE) return null
     const slots = this.byTextNode.get(node as Text)
     if (!slots) return null
@@ -204,10 +218,19 @@ export class LearningHighlighter {
         return slot.occurrence
       }
     }
+
+    // A caret at a mark's trailing edge counts as a hit: pointing at the right
+    // half of a word resolves to the offset just after it, and readers aim at the
+    // word, not at its leading pixel. Chromium also clamps a caret in empty space
+    // to the nearest text position, so the far end of a line resolves to the end
+    // of its last word - which is why this rule only stands when the pointer is
+    // actually on that word's box.
     for (const slot of slots) {
-      if (offset === slot.end) {
-        return slot.occurrence
+      if (offset !== slot.end) continue
+      if (point && !containsPoint(slot.occurrence.range.getBoundingClientRect(), point)) {
+        continue
       }
+      return slot.occurrence
     }
     return null
   }
