@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
 
-import type { LearningDictionaryEntry } from "../types"
 import { describe, expect, it } from "vitest"
 import { LearningHighlighter } from "../highlighter"
 

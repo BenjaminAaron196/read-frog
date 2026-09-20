@@ -73,6 +73,20 @@ describe("viewport scanner", () => {
     ).toEqual(["chancellor", "coalition"])
   })
 
+  it("marks the words in a custom element that holds prose", async () => {
+    // YouTube renders a comment inside `<yt-attributed-string>`, whose text is its
+    // own: neither a block tag nor a div, so it used to be invisible to the scan.
+    expect(
+      await scan("<yt-attributed-string>the chancellor met the coalition</yt-attributed-string>"),
+    ).toEqual(["chancellor", "coalition"])
+  })
+
+  it("leaves a custom element that only wraps other blocks to its children", async () => {
+    expect(
+      await scan("<yt-attributed-string><p>the chancellor</p></yt-attributed-string>"),
+    ).toEqual(["chancellor"])
+  })
+
   it("leaves a div that only wraps other blocks to its children", async () => {
     // A div holding blocks is layout, not prose: walking it would pull its whole
     // subtree into one scan, which is the pass the viewport policy avoids.

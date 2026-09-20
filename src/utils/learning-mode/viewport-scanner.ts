@@ -68,10 +68,28 @@ const NESTED_BLOCK_SELECTOR = [
   "h6",
 ].join(",")
 
-/** Whether an element is a reading unit: a block, or a div that is its own text. */
+/**
+ * Custom elements that hold prose: `<yt-attributed-string>` renders a YouTube
+ * comment, and sites that ship their own paragraph element look the same to us -
+ * a hyphenated tag whose text is its own.
+ */
+function isCustomElement(element: Element): boolean {
+  return element.tagName.includes("-")
+}
+
+/** Every element worth watching: the reading blocks, plus the custom elements. */
+function collectCandidates(): Element[] {
+  const blocks = [...document.querySelectorAll(CONTENT_BLOCK_SELECTOR)]
+  const custom = [...document.getElementsByTagName("*")].filter(isCustomElement)
+  return custom.length === 0 ? blocks : [...blocks, ...custom]
+}
+
+/** Whether an element is a reading unit: a block, or a container that is its own text. */
 function isReadingUnit(element: Element): boolean {
-  if (element.tagName !== "DIV") return true
-  return element.querySelector(NESTED_BLOCK_SELECTOR) === null
+  if (element.tagName === "DIV" || isCustomElement(element)) {
+    return element.querySelector(NESTED_BLOCK_SELECTOR) === null
+  }
+  return true
 }
 
 export interface ViewportScannerOptions {
@@ -157,7 +175,7 @@ export function startViewportScanning(options: ViewportScannerOptions): Viewport
     }, 120)
   }
 
-  const blocks = [...document.querySelectorAll(CONTENT_BLOCK_SELECTOR)]
+  const blocks = collectCandidates()
 
   const supportsObserver = typeof IntersectionObserver === "function"
   const observer = supportsObserver
@@ -188,9 +206,10 @@ export function startViewportScanning(options: ViewportScannerOptions): Viewport
     for (const record of records) {
       for (const node of record.addedNodes) {
         if (!(node instanceof HTMLElement)) continue
-        const block = node.matches(CONTENT_BLOCK_SELECTOR)
-          ? node
-          : node.querySelector(CONTENT_BLOCK_SELECTOR)
+        const block =
+          node.matches(CONTENT_BLOCK_SELECTOR) || isCustomElement(node)
+            ? node
+            : node.querySelector(CONTENT_BLOCK_SELECTOR)
         if (block && isReadingUnit(block)) queue(block)
       }
     }
