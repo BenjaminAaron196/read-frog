@@ -39,6 +39,7 @@ export async function bootstrapHostContent(
     root: null,
     rootMargin: `${preloadConfig.margin}px`,
     threshold: preloadConfig.threshold,
+    dispatchReachPx: preloadConfig.margin,
   })
 
   const cleanupPageTranslationTriggers = manager.registerPageTranslationTriggers()

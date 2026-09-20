@@ -16,6 +16,7 @@ import {
   GIANT_PARAGRAPH_SPLIT_MIN_VIEWPORT_PX,
   GIANT_PARAGRAPH_SPLIT_VIEWPORT_MULTIPLIER,
   GIANT_SPLIT_STRANDED_TEXT_MAX_UNITS,
+  LAZY_DISPATCH_MAX_REACH_VIEWPORT_FRACTION,
 } from "@/utils/constants/translate"
 import { getRandomUUID } from "@/utils/crypto-polyfill"
 import {
@@ -37,6 +38,10 @@ import {
   wasNodeRemovedByExtension,
 } from "@/utils/host/translate/core/translation-state"
 import { canSplitParagraphIntoDescendants } from "@/utils/host/translate/dom/paragraph-segmentation"
+import {
+  createLazyDispatchQueue,
+  type LazyDispatchQueue,
+} from "@/utils/host/translate/lazy-dispatch"
 import {
   removeAllTranslatedWrapperNodes,
   translateNodes,
@@ -69,6 +74,17 @@ import { getEffectiveSiteRule } from "@/utils/site-rules/effective"
 
 type SimpleIntersectionOptions = Omit<IntersectionObserverInit, "threshold"> & {
   threshold?: number
+}
+
+type PageTranslationManagerOptions = SimpleIntersectionOptions & {
+  /**
+   * How far below the fold a queued paragraph may start translating (px). The
+   * intersection margin decides how early paragraphs are *noticed*; this
+   * decides how far ahead of the reader they may actually be translated. The
+   * manager additionally caps it at
+   * `LAZY_DISPATCH_MAX_REACH_VIEWPORT_FRACTION` of the viewport.
+   */
+  dispatchReachPx?: number
 }
 
 type DebouncedRetry = (() => void) & { clear: () => void }
@@ -137,6 +153,11 @@ export class PageTranslationManager implements IPageTranslationManager {
   /** Non-null while a start() is between its guard and activation; see start(). */
   private pendingStart: symbol | null = null
   private intersectionObserver: IntersectionObserver | null = null
+  /** Idle-paced, viewport-gated dispatch of observed paragraphs; per session. */
+  private lazyDispatch: LazyDispatchQueue | null = null
+  /** Config used by the next dispatch slice; refreshed by the queue per slice. */
+  private dispatchConfig: Config | null = null
+  private readonly dispatchReachPx: number
   private mutationObservers: MutationObserver[] = []
   private observedMutationRoots = new WeakSet<Node>()
   private walkId: string | null = null
@@ -157,13 +178,16 @@ export class PageTranslationManager implements IPageTranslationManager {
   private lastAppliedTranslatedTitle: string | null = null
   private titleRequestVersion = 0
 
-  constructor(intersectionOptions: SimpleIntersectionOptions = {}) {
+  constructor(options: PageTranslationManagerOptions = {}) {
+    const { dispatchReachPx, ...intersectionOptions } = options
+
     if (intersectionOptions.threshold !== undefined) {
       if (intersectionOptions.threshold < 0 || intersectionOptions.threshold > 1) {
         throw new Error("IntersectionObserver threshold must be between 0 and 1")
       }
     }
 
+    this.dispatchReachPx = dispatchReachPx ?? 0
     this.intersectionOptions = {
       ...PageTranslationManager.DEFAULT_INTERSECTION_OPTIONS,
       ...intersectionOptions,
@@ -317,6 +341,43 @@ export class PageTranslationManager implements IPageTranslationManager {
       // Listen to existing elements when they enter the viewport
       const walkId = getRandomUUID()
       this.walkId = walkId
+
+      const isWalkCurrent = () => this.isPageTranslating && this.walkId === walkId
+
+      // Paragraphs the observer reports are *queued*, not translated on the
+      // spot: translation runs during idle slices, one unit at a time, only
+      // once the unit is within reach of the viewport, and never while the
+      // document is hidden (see lazy-dispatch.ts). What the reader eventually
+      // gets is unchanged — a paragraph is translated as they approach it.
+      const lazyDispatch = createLazyDispatchQueue({
+        isEligible: (unit) => this.isWithinDispatchReach(unit),
+        beforeSlice: async () => {
+          this.dispatchConfig = (await getLocalConfig()) ?? this.dispatchConfig
+        },
+        run: async (unit) => {
+          // `config` is the session's starting snapshot; beforeSlice refreshes
+          // it once per slice, the way the old per-callback read did (#1881),
+          // so live config edits still reach in-flight paragraphs.
+          const currentConfig = this.dispatchConfig
+          if (!currentConfig) {
+            logger.error("Global config is not initialized")
+            return
+          }
+          await translateWalkedElement(
+            unit,
+            walkId,
+            currentConfig,
+            false,
+            createWorkPacer(),
+            isWalkCurrent,
+          )
+        },
+        shouldContinue: isWalkCurrent,
+      })
+      this.lazyDispatch = lazyDispatch
+      this.dispatchConfig = config
+      lazyDispatch.start()
+
       this.intersectionObserver = new IntersectionObserver((entries, observer) => {
         const targets: HTMLElement[] = []
         for (const entry of entries) {
@@ -327,24 +388,7 @@ export class PageTranslationManager implements IPageTranslationManager {
           }
         }
         if (targets.length === 0) return
-        void (async () => {
-          // One config read per callback batch — a dense first intersection
-          // can deliver hundreds of entries at once (#1881).
-          const currentConfig = await getLocalConfig()
-          if (!currentConfig) {
-            logger.error("Global config is not initialized")
-            return
-          }
-          if (this.walkId !== walkId) return
-          // One shared pacer bounds the batch's synchronous expansion work;
-          // the liveness check stops paced expansion promptly if the user
-          // cancels mid-flight (#1881).
-          const pacer = createWorkPacer()
-          const isWalkCurrent = () => this.walkId === walkId
-          for (const target of targets) {
-            void translateWalkedElement(target, walkId, currentConfig, false, pacer, isWalkCurrent)
-          }
-        })()
+        lazyDispatch.enqueue(targets)
       }, this.intersectionOptions)
 
       // Observe mutations BEFORE the chunked walk: page JS runs between walk
@@ -462,6 +506,9 @@ export class PageTranslationManager implements IPageTranslationManager {
     this.isPageTranslating = false
     this.translationSessionVersion += 1
     this.walkId = null
+    this.lazyDispatch?.stop()
+    this.lazyDispatch = null
+    this.dispatchConfig = null
     this.walkBlockedElementsCache = new WeakSet()
     this.refreshingTranslatedSources = new WeakSet()
     this.translatedSourceMutationVersions = new WeakMap()
@@ -665,6 +712,23 @@ export class PageTranslationManager implements IPageTranslationManager {
         logger.warn("Failed to translate document title:", error)
       }
     }
+  }
+
+  /**
+   * Whether a queued paragraph is close enough to the reader to be translated
+   * now. Paragraphs the reader has already passed (above the fold) always
+   * qualify; below the fold the reach is the smaller of the configured preload
+   * range and a fraction of a viewport, so a large range cannot translate
+   * screens of text the reader may never reach. Called at dispatch time, after
+   * `beforeSlice` — insertions above the unit can push it back out of reach
+   * while it waits.
+   */
+  private isWithinDispatchReach(element: HTMLElement): boolean {
+    const reach = Math.min(
+      this.dispatchReachPx,
+      window.innerHeight * LAZY_DISPATCH_MAX_REACH_VIEWPORT_FRACTION,
+    )
+    return element.getBoundingClientRect().top <= window.innerHeight + reach
   }
 
   private async observeTopLevelParagraphs(

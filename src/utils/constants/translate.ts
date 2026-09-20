@@ -29,6 +29,16 @@ export const MIN_PRELOAD_MARGIN = 0
 export const MAX_PRELOAD_MARGIN = 10000
 export const DEFAULT_PRELOAD_MARGIN = 1000
 
+// Ceiling on how far below the fold page translation may start a paragraph,
+// as a fraction of the viewport height. The preload range decides how early a
+// paragraph is *noticed* (queued); this decides how far ahead of the reader it
+// may actually be translated, so a large range cannot translate screens of
+// text the reader may never reach. Measured on
+// en.wikipedia.org/wiki/Language_acquisition, the 1000px default translated
+// 47% of its units while they were still off-screen; a quarter-screen reach
+// keeps speculation at the part of the page the reader is about to look at.
+export const LAZY_DISPATCH_MAX_REACH_VIEWPORT_FRACTION = 0.25
+
 export const MIN_PRELOAD_THRESHOLD = 0
 export const MAX_PRELOAD_THRESHOLD = 1
 export const DEFAULT_PRELOAD_THRESHOLD = 0
