@@ -374,6 +374,15 @@ export async function startLearningMode(config: Config): Promise<LearningModeRun
    * the same text, so its answer is only trusted when the mark's own box covers
    * the pointer.
    */
+  let lastFallbackAt = 0
+  /**
+   * The geometric fallback walks the marks, and each one it touches forces a
+   * layout. It exists for transformed subtrees, where the caret answers in layout
+   * space - a rare situation - so it is also rationed: a pointer crossing such a
+   * region must not pay that walk on every move.
+   */
+  const FALLBACK_MIN_INTERVAL_MS = 250
+
   const resolveOccurrence = (
     x: number,
     y: number,
@@ -384,6 +393,10 @@ export async function startLearningMode(config: Config): Promise<LearningModeRun
       return fromCaret
     }
     if (!caret) return null
+
+    const now = performance.now()
+    if (now - lastFallbackAt < FALLBACK_MIN_INTERVAL_MS) return fromCaret
+    lastFallbackAt = now
     return highlighter.hitTestPoint(x, y)
   }
 

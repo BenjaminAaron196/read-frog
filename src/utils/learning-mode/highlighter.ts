@@ -221,8 +221,10 @@ export class LearningHighlighter {
    * not looking at. Geometry is the authority when the two disagree.
    */
   hitTestPoint(x: number, y: number, margin = 4): MarkedOccurrence | null {
-    let best: MarkedOccurrence | null = null
-    let bestArea = Number.POSITIVE_INFINITY
+    // First hit wins: every candidate costs a forced layout, and a page can carry
+    // thousands of marks. The caller only reaches here when the caret named a mark
+    // whose box does not cover the pointer, so the answer is a correction, not a
+    // survey.
     for (const occurrence of this.occurrences) {
       const rect = occurrence.range.getBoundingClientRect()
       if (rect.width === 0 && rect.height === 0) continue
@@ -234,13 +236,9 @@ export class LearningHighlighter {
       ) {
         continue
       }
-      const area = rect.width * rect.height
-      if (area < bestArea) {
-        best = occurrence
-        bestArea = area
-      }
+      return occurrence
     }
-    return best
+    return null
   }
 
   reset(): void {
